@@ -1,9 +1,9 @@
 """Authentication backend: one credential field, three ways to fill it in."""
 from django.contrib.auth import get_user_model
-from django.contrib.auth.backends import ModelBackend
 from django.db.models import Q
+from django.contrib.auth.backends import ModelBackend
 
-from apps.accounts.utils import normalise_phone
+from apps.accounts.utils import users_matching_phone
 
 
 class EmailPhoneOrUsernameBackend(ModelBackend):
@@ -14,11 +14,11 @@ class EmailPhoneOrUsernameBackend(ModelBackend):
     gave the office than an email address they may not use, so the login form
     takes one "email or phone" field and this backend works out which it is.
 
-    Phone matching is done on digits alone: a number stored as
-    ``+880 1700-000000`` still authenticates when typed as ``01700000000``.
-    The comparison is narrowed in SQL and then confirmed in Python, and an
-    ambiguous number — two accounts normalising to the same digits — is refused
-    rather than guessed at.
+    Phone matching ignores formatting and the country code — ``01700000000``
+    signs in an account stored as ``+880 1700-000000``. An ambiguous number,
+    one that somehow reaches two accounts, is refused rather than guessed at;
+    :func:`~apps.accounts.utils.validate_phone_value` stops that pair being
+    created in the first place.
     """
 
     def authenticate(self, request, username=None, password=None, **kwargs):
@@ -46,17 +46,7 @@ class EmailPhoneOrUsernameBackend(ModelBackend):
         if exact is not None:
             return exact
 
-        digits = normalise_phone(identifier)
-        if len(digits) < 6:
-            return None
-
-        # `endswith` narrows the scan; the Python comparison below is what
-        # actually decides, since formatting differs between records.
-        candidates = [
-            user
-            for user in User.objects.filter(phone__endswith=digits[-6:]).select_related("role")
-            if normalise_phone(user.phone) == digits
-        ]
+        candidates = users_matching_phone(identifier)
         return candidates[0] if len(candidates) == 1 else None
 
     def user_can_authenticate(self, user) -> bool:

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from 'lucide-react'
+import { Bell, ChevronDown, Globe, LogOut, Menu, Search, Settings, User } from 'lucide-react'
 
 import cn from '@/utils/cn'
 import useAuth from '@/hooks/useAuth'
@@ -26,7 +26,9 @@ export function Topbar({ onOpenMobileNav, notices = [] }) {
     setProfileOpen(false)
     await logout()
     toast.success('You have been signed out.')
-    navigate('/login', { replace: true })
+    // Out of the dashboard and back to the public site, not to a login form
+    // nobody asked for.
+    navigate('/', { replace: true })
   }
 
   const roleName = user?.role?.name ?? user?.role ?? 'No role'
@@ -156,6 +158,14 @@ export function Topbar({ onOpenMobileNav, notices = [] }) {
                   className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"
                 >
                   <Settings className="h-4 w-4 text-slate-400" /> Settings
+                </Link>
+                <Link
+                  to="/"
+                  role="menuitem"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  <Globe className="h-4 w-4 text-slate-400" /> School website
                 </Link>
               </div>
               <div className="border-t border-slate-100 p-1.5">

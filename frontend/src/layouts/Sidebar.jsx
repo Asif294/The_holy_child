@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { ChevronLeft, X } from 'lucide-react'
 
 import cn from '@/utils/cn'
@@ -30,13 +30,25 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
         )}
         aria-label="Main navigation"
       >
-        {/* Brand */}
+        {/* Brand — the school's own name and crest, so it leads to the school's
+            public home page rather than back to the dashboard. */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4">
-          {isCollapsed ? (
-            <LogoMark className="mx-auto h-9 w-9" />
-          ) : (
-            <Logo variant="light" markClassName="h-9 w-9" />
-          )}
+          <Link
+            to="/"
+            onClick={onCloseMobile}
+            title="Go to the school website"
+            aria-label="Go to the school website"
+            className={cn(
+              'min-w-0 rounded-lg transition-opacity hover:opacity-80',
+              isCollapsed && 'mx-auto',
+            )}
+          >
+            {isCollapsed ? (
+              <LogoMark className="h-9 w-9" />
+            ) : (
+              <Logo variant="light" markClassName="h-9 w-9" />
+            )}
+          </Link>
           <button
             type="button"
             onClick={onCloseMobile}

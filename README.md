@@ -22,6 +22,10 @@ navigation and the Django API adapt immediately, with no code change.
 Nothing in the codebase branches on a role *name*. Every authorisation decision
 asks one question: *does this user hold permission code X?*
 
+In front of it sits the school's **own public website** — hero slider, about,
+teachers, administration and results — open to every visitor, with every word
+and image on it editable from the dashboard by whoever holds the code for it.
+
 ```
 Admin creates Role  →  selects permissions  →  assigns Role to User
         ↓
@@ -39,6 +43,7 @@ Django rejects requests the user cannot make   (security)
 - [Environment variables](#environment-variables)
 - [Database setup](#database-setup)
 - [Project structure](#project-structure)
+- [The public website](#the-public-website)
 - [Authentication](#authentication)
 - [The role & permission system](#the-role--permission-system)
 - [API reference](#api-reference)
@@ -192,7 +197,9 @@ TheHollyChild/
 │       ├── attendance/         StudentAttendance · TeacherAttendance
 │       ├── fees/               FeeCategory · FeeStructure · Invoice · Payment
 │       ├── exams/              ExamType · Exam · ExamSchedule · Result
-│       └── dashboard/          SchoolEvent · ActivityLog · aggregation services
+│       ├── dashboard/          SchoolEvent · ActivityLog · SchoolProfile
+│       └── website/            HeroSlide · AboutSection · Achievement ·
+│                               SuccessfulStudent — the public landing page
 │
 └── frontend/
     ├── index.html
@@ -202,20 +209,91 @@ TheHollyChild/
         ├── components/
         │   ├── ui/             Button · Card · Input · Modal · Table · Badge · …
         │   ├── common/         Logo · Can · DataTable · CrudPage · ErrorBoundary
-        │   ├── landing/        Navbar · Hero · Features · CTA · Footer · …
+        │   ├── landing/        Navbar · HeroSlider · AboutSchool ·
+        │                       Administration · TeachersSection ·
+        │                       SuccessfulStudents · Footer
         │   └── dashboard/      StatCard · Charts
         ├── layouts/            DashboardLayout · Sidebar · Topbar · AuthLayout
         ├── routes/             AppRoutes · ProtectedRoute · PermissionRoute
         ├── services/           api.js (interceptors) · authService · resource services
         ├── context/            AuthContext · ToastContext
         ├── hooks/              useAuth · useApi · usePaginatedList · useToast · …
-        ├── pages/              landing · auth · dashboard · academics · finance · system
+        ├── pages/              landing · auth · dashboard · academics ·
+        │                       website · principal · finance · system
         └── utils/              constants · permissions · navigation · formatters
 ```
 
 The larger backend apps use package-style modules
 (`models/`, `serializers/`, `views/` directories with `__init__.py` re-exports);
 the smaller ones use single files. Both follow the same conventions.
+
+---
+
+## The public website
+
+`/` is the school's own website, and it is open to everyone — no token is sent
+and no section requires a session. Every word and image on it is editable from
+the dashboard, so a rename, a new banner or this year's results never need a
+deploy.
+
+The rule the whole page is built on: **reading is public, writing is a
+permission code.** Each model behind the site has two endpoints — an
+`AllowAny` read-only one under `/public/` exposing only presentation fields,
+and a permission-gated viewset that owns create, update and delete. They never
+share a serializer; the public shape is a deliberate subset. The staff
+directory is the clearest case: the public one carries photo, designation,
+department and subjects, and no email, phone, national ID or date of birth.
+
+### The sections
+
+| Section | Reads | Managed at | Code |
+| --- | --- | --- | --- |
+| Hero slider | `GET /api/v1/public/hero-slides/` | Public Website → Hero slider | `content.*` |
+| About the school | `GET /api/v1/public/about/` | Public Website → About the school | `content.*` |
+| Achievements | (part of `/public/about/`) | Public Website → Achievements | `content.*` |
+| Teachers | `GET /api/v1/public/teachers/` | Academics → Teachers | `teacher.*` |
+| Administration | `GET /api/v1/public/administration/` | Principal's Office → Administration | `principal.*` |
+| Successful students | `GET /api/v1/public/successful-students/` | Public Website → Successful students | `achiever.*` |
+
+Two supporting endpoints: `GET /api/v1/public/successful-students/years/`
+returns the distinct academic years, newest first, which is what fills the year
+filter; and `GET /api/v1/school/info/` returns the school's identity and
+headline counts.
+
+### Hero slider
+
+Slides rotate every six seconds and can be stepped through with the arrows,
+the dots or the arrow keys. Rotation pauses on hover, on keyboard focus and
+whenever the tab is hidden, and stops for good once a visitor uses the arrows —
+someone reading a slide should not have it pulled away from them. With no
+slides uploaded the hero falls back to a built-in gradient banner carrying the
+school's name and figures, so a fresh install still looks finished.
+
+### Administration
+
+`Principal.office` distinguishes the two seats, `principal` and
+`vice_principal`. One record per office is `is_current` at a time, so recording
+a vice principal does not stand the principal down. Both are governed by the
+same `principal.*` codes and administered on one screen.
+
+### Successful students
+
+Deliberately independent of the student register: a pupil who left in 2019 still
+belongs on the honour board, and a name on it need not have an enrolment record
+behind it. `student` links the two when the pupil is still on the roll, and is
+optional precisely so it can be left empty when they are not. Visitors filter
+by academic year, which re-queries rather than filtering in memory.
+
+### Uploading files
+
+Any endpoint that accepts a file accepts `multipart/form-data`, and every
+serializer behind one extends `apps.common.serializers.MultipartModelSerializer`
+rather than DRF's `ModelSerializer`. The difference is one field class: DRF
+reads an *absent* boolean in an HTML form as `False`, which is right for an
+unticked checkbox and wrong for an API — without it, creating a record with a
+photograph attached would file it away deactivated. See
+`FormSafeBooleanField` for the detail, and `apps.website.tests` for the
+regression tests.
 
 ---
 
@@ -226,8 +304,8 @@ blacklisting.
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/register/` | Self-registration. |
-| `POST` | `/api/v1/auth/login/` | Returns `access`, `refresh` and the user with permission codes. |
+| `POST` | `/api/v1/auth/register/` | Self-registration (API only — no public sign-up page). |
+| `POST` | `/api/v1/auth/login/` | Email, phone or username + password. Returns `access`, `refresh` and the user with permission codes. |
 | `POST` | `/api/v1/auth/token/refresh/` | Rotates the token pair. |
 | `POST` | `/api/v1/auth/logout/` | Blacklists the refresh token. |
 | `GET` | `/api/v1/auth/me/` | The signed-in user. |
@@ -256,12 +334,48 @@ Send the access token on every protected request:
 Authorization: Bearer <access_token>
 ```
 
-**Registration is deliberately restricted.** The role is assigned by the server
-(the default self-registration role, `Student`). A `role`, `is_staff` or
-`is_superuser` field in the request body is ignored — there is no path by which a
-registrant can promote themselves. Staff accounts are created by an
+### Signing in with a phone number
+
+The login form has one identity box. `identifier` accepts an **email address, a
+phone number or a username**, and
+`apps.accounts.backends.EmailPhoneOrUsernameBackend` works out which it is.
+`email`, `phone` and `username` are accepted as aliases for `identifier`, so
+older clients keep working.
+
+```json
+{ "identifier": "01700000000", "password": "••••••••" }
+{ "identifier": "teacher@holychildschool.edu.bd", "password": "••••••••" }
+```
+
+Phone matching ignores formatting **and the country code** — an account filed
+as `+880 1700-000000` signs in as `01700000000`. Identity is the last ten
+digits (`apps.accounts.utils.phone_key`); the stored string keeps whatever the
+office typed. Because the number is a credential it must point at exactly one
+account, so `User.phone` carries a conditional unique constraint (blank stays
+freely repeatable) and the serializers reject a second account claiming the
+same number written differently.
+
+Anyone signed in can change their own password from **My profile**
+(`POST /api/v1/auth/change-password/`), which re-checks the current password
+and validates the new one against Django's full password policy.
+
+### Where sign-in leads
+
+Signing in lands on the **school's public home page**, not the dashboard. The
+header's *Admin* button becomes *Dashboard*, and from there each role reaches
+whatever its permission codes allow. The public site is the front door for
+everyone; the dashboard is one click further in.
+
+**There is no public sign-up.** The landing page carries a single *Admin*
+button; `/register` redirects to `/login`. Accounts are created by an
 administrator through `POST /api/v1/users/`, which itself requires
 `user.create`.
+
+The `POST /api/v1/auth/register/` endpoint remains for programmatic use and is
+deliberately restricted: the role is assigned by the server (the default
+self-registration role, `Student`), and a `role`, `is_staff` or `is_superuser`
+field in the request body is ignored — there is no path by which a registrant
+can promote themselves.
 
 Registration validates: unique email, matching password confirmation, Django's
 full password policy, phone format, and a minimum-length full name.
@@ -291,6 +405,8 @@ teacher.view    teacher.create    teacher.update    teacher.delete
 class.*  subject.*  attendance.*  exam.*  fee.*  payment.*  admission.*  notice.*
 result.view  result.create  result.update  result.delete  result.publish
 principal.view  principal.update  principal.approve
+content.*       website content — hero slider, about copy, achievements
+achiever.*      the public successful-students honour board
 report.view  report.export
 user.*  role.*  permission.view  setting.view  setting.update  dashboard.view
 ```
@@ -307,8 +423,8 @@ marks without being able to release them.
 | Role | Slug | Notes |
 | --- | --- | --- |
 | Super Admin | `super-admin` | Every permission. System role — cannot be renamed or deleted. |
-| School Admin | `school-admin` | Full academic and finance operations. System role. |
-| Principal | `principal` | Oversight, approvals, notices, result publication. |
+| School Admin | `school-admin` | Full academic and finance operations, plus the public website. System role. |
+| Principal | `principal` | Oversight, approvals, notices, result publication, public website. |
 | Teacher | `teacher` | Attendance, marks, and read access to their classes. |
 | Accountant | `accountant` | Fees, invoices, payments, financial reports. |
 | Receptionist | `receptionist` | Admissions intake and the student directory. |
@@ -398,7 +514,7 @@ Interactive documentation, generated by **drf-spectacular**:
 Every endpoint documents its request body, response schema, authentication
 requirement, error responses and permission code, grouped under tags:
 *Authentication · Users · Roles · Permissions · Dashboard · Principal · Teachers ·
-Students · Classes · Subjects · Attendance · Fees · Exams*.
+Students · Classes · Subjects · Attendance · Fees · Exams · Website · Public site*.
 
 ### Endpoint map
 
@@ -407,7 +523,7 @@ All resources live under `/api/v1/` and use plural nouns.
 | Area | Endpoints |
 | --- | --- |
 | Access control | `users/` · `users/{id}/assign-role/` · `roles/` · `roles/{id}/permissions/` · `permissions/` · `permissions/grouped/` |
-| Principal's office | `principals/` · `principals/current/` · `principals/dashboard/` · `notices/` · `notices/{id}/publish/` · `approval-requests/` · `approval-requests/{id}/decide/` · `approval-requests/mine/` · `public/principal/` |
+| Principal's office | `principals/` · `principals/current/` · `principals/dashboard/` · `notices/` · `notices/{id}/publish/` · `approval-requests/` · `approval-requests/{id}/decide/` · `approval-requests/mine/` |
 | Teachers | `teachers/` · `teachers/statistics/` · `teachers/me/` · `designations/` · `departments/` |
 | Students | `students/` · `students/statistics/` · `guardians/` |
 | Classes | `classes/` · `sections/` · `academic-sessions/` |
@@ -416,7 +532,8 @@ All resources live under `/api/v1/` and use plural nouns.
 | Fees | `fee-categories/` · `fee-structures/` · `invoices/` · `invoices/statistics/` · `invoices/outstanding/` · `payments/` · `payments/recent/` |
 | Exams | `exams/` · `exams/upcoming/` · `exam-types/` · `exam-schedules/` · `results/` · `results/publish/` · `results/student-summary/` |
 | Dashboard | `dashboard/overview/` · `dashboard/summary/` · `dashboard/attendance-trend/` · `dashboard/enrollment/` · `dashboard/fee-trend/` · `dashboard/activities/` · `events/` |
-| Public | `school/info/` · `public/principal/` |
+| Website content | `hero-slides/` · `website/about/` · `achievements/` · `successful-students/` |
+| Public (no auth) | `school/info/` · `public/hero-slides/` · `public/about/` · `public/teachers/` · `public/administration/` · `public/principal/` · `public/successful-students/` · `public/successful-students/years/` |
 
 ### Two endpoints worth knowing
 
@@ -545,6 +662,11 @@ The cached user is shown immediately on boot so the shell does not flash, then
 
 ### Route protection
 
+`/` is deliberately outside both guards — the school's website is public, and
+signing in adds the management surface rather than unlocking the site.
+Everything under `/app` is wrapped twice: `ProtectedRoute` for authentication
+and `PermissionRoute` for the code the screen needs.
+
 ```jsx
 <ProtectedRoute>
   <Dashboard />
@@ -574,7 +696,8 @@ code, never a role:
 `visibleNavigation()` filters the entries a user cannot reach, then drops any
 section left empty. A Teacher sees *Dashboard · Students · Classes · Subjects ·
 Attendance · Exams · Results*; an Accountant sees *Dashboard · Fees · Invoices ·
-Payments · Reports*. Nobody wrote either list — both fall out of the codes.
+Payments · Reports*; a School Admin additionally sees the *Public Website*
+section. Nobody wrote any of those lists — they all fall out of the codes.
 
 Inside a page, `<Can>` hides individual controls:
 

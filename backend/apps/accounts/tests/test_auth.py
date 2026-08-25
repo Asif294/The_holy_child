@@ -207,6 +207,12 @@ class LoginIdentifierTests(APITestCase):
         response = self.login({"identifier": "+880 1700 111 222", "password": self.password})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_login_with_the_phone_number_without_its_country_code(self):
+        """The office files "+8801700111222"; the teacher types "01700111222"."""
+        response = self.login({"identifier": "01700111222", "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"]["email"], self.user.email)
+
     def test_login_with_the_username(self):
         response = self.login({"identifier": "nasrin", "password": self.password})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -222,6 +228,24 @@ class LoginIdentifierTests(APITestCase):
     def test_a_missing_identifier_is_a_validation_error(self):
         response = self.login({"password": self.password})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_a_second_account_cannot_claim_the_same_number_written_differently(self):
+        """
+        Otherwise the number identifies two accounts and can sign in to neither.
+        """
+        response = self.client.post(
+            reverse("v1:auth-register"),
+            {
+                "full_name": "Copycat User",
+                "email": "copycat2@example.com",
+                "password": "StrongPass!2026",
+                "password_confirmation": "StrongPass!2026",
+                "phone": "01700111222",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("phone", response.data["errors"])
 
     def test_a_second_account_cannot_claim_the_same_phone_number(self):
         response = self.client.post(
