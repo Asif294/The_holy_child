@@ -15,6 +15,13 @@ const WIDTHS = {
 export function Modal({ isOpen, onClose, title, description, size = 'md', footer, children, className }) {
   const panelRef = useRef(null)
 
+  // Held in a ref so the focus/scroll-lock effect below depends on `isOpen`
+  // alone. Callers pass an inline `onClose`, which is a new function on every
+  // render — as a dependency it would tear the effect down and re-run it after
+  // every keystroke, pulling focus out of whatever field is being typed into.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!isOpen) return undefined
 
@@ -24,7 +31,7 @@ export function Modal({ isOpen, onClose, title, description, size = 'md', footer
     panelRef.current?.focus()
 
     function onKeyDown(event) {
-      if (event.key === 'Escape') onClose?.()
+      if (event.key === 'Escape') onCloseRef.current?.()
     }
     document.addEventListener('keydown', onKeyDown)
 
@@ -33,7 +40,7 @@ export function Modal({ isOpen, onClose, title, description, size = 'md', footer
       document.body.style.overflow = overflow
       previouslyFocused?.focus?.()
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   if (!isOpen) return null
 
