@@ -28,8 +28,12 @@ const TABS = [
 const PROFILE_FIELDS = [
   { name: 'name_en', label: 'Name (English)', required: true, fullWidth: true },
   { name: 'name_bn', label: 'Name (Bangla)', fullWidth: true },
-  { name: 'short_name', label: 'Short name', hint: 'Used in the sidebar and on narrow screens.' },
-  { name: 'brand_name', label: 'Brand wordmark', hint: 'Shown beside the crest.' },
+  { name: 'short_name', label: 'Short name', hint: 'Used on narrow screens and under the crest.' },
+  {
+    name: 'brand_name',
+    label: 'Brand wordmark',
+    hint: 'The software\u2019s name — used in browser tab titles and the site footer only.',
+  },
   { name: 'village', label: 'Village / area' },
   { name: 'upazila', label: 'Upazila' },
   { name: 'district', label: 'District' },

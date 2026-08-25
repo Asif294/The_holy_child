@@ -46,7 +46,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
             {isCollapsed ? (
               <LogoMark className="h-9 w-9" />
             ) : (
-              <Logo variant="light" markClassName="h-9 w-9" />
+              <Logo variant="light" markClassName="h-9 w-9" primary="school" multiline showTagline={false} />
             )}
           </Link>
           <button

@@ -4,6 +4,7 @@ import { LayoutDashboard, Menu, ShieldCheck, X } from 'lucide-react'
 
 import cn from '@/utils/cn'
 import useAuth from '@/hooks/useAuth'
+import useSchool from '@/hooks/useSchool'
 import Button from '@/components/ui/Button'
 import { Logo } from '@/components/common/Logo'
 
@@ -26,6 +27,7 @@ const LINKS = [
  */
 export function Navbar() {
   const { isAuthenticated, user } = useAuth()
+  const { school } = useSchool()
   const [isOpen, setOpen] = useState(false)
   const [isScrolled, setScrolled] = useState(false)
 
@@ -52,8 +54,8 @@ export function Navbar() {
       )}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link to="/" aria-label={`${isAuthenticated ? 'Dashboard' : 'School'} home`}>
-          <Logo variant={isScrolled ? 'dark' : 'light'} />
+        <Link to="/" className="min-w-0" aria-label={`${school.name_en} home`}>
+          <Logo variant={isScrolled ? 'dark' : 'light'} primary="school" />
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">

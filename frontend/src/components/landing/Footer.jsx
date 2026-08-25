@@ -40,9 +40,14 @@ export function Footer() {
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3">
               <LogoMark className="h-11 w-11" />
-              <div>
-                <p className="text-lg font-extrabold text-white">{school.brand_name}</p>
-                <p className="text-xs text-brand-300">{school.name_en}</p>
+              <div className="min-w-0">
+                {/* The school's own name leads here too — `brand_name` is the
+                    product wordmark and belongs in the dashboard, not on the
+                    school's front page. */}
+                <p className="text-lg font-extrabold leading-tight text-white">{school.name_en}</p>
+                <p className="mt-0.5 text-xs text-brand-300">
+                  {[school.short_name, school.address].filter(Boolean).join(' · ')}
+                </p>
               </div>
             </div>
 

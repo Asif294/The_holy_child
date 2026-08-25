@@ -18,8 +18,8 @@ export function AuthLayout() {
       {/* Form side */}
       <div className="flex flex-col px-5 py-8 sm:px-10">
         <div className="flex items-center justify-between">
-          <Link to="/" aria-label="Back to home">
-            <Logo />
+          <Link to="/" className="min-w-0" aria-label={`Back to ${school.name_en}`}>
+            <Logo primary="school" />
           </Link>
           <Link
             to="/"

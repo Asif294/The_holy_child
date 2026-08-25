@@ -62,12 +62,13 @@ export function LogoMark({ className, title }) {
 }
 
 /**
- * Splits the wordmark so its tail picks up the gold accent — "SmartSchool"
- * renders as Smart+School. A single-word brand simply stays one colour.
+ * Splits a wordmark so its tail picks up the gold accent — "SmartSchool"
+ * renders as Smart+School, "…Pre-Cadet & High School" keeps its last word in
+ * gold. A name that does not end in one of these words simply stays one colour.
  */
-function renderBrand(brand) {
-  const match = /^(.*?)(School|Academy|Institute|Campus)$/i.exec(brand)
-  if (!match) return brand
+function renderWordmark(name) {
+  const match = /^(.*?)(School|Academy|Institute|Campus|College|Madrasah)$/i.exec(name)
+  if (!match) return name
   return (
     <>
       {match[1]}
@@ -76,21 +77,75 @@ function renderBrand(brand) {
   )
 }
 
-export function Logo({ className, markClassName, variant = 'dark', showTagline = true }) {
+/**
+ * The crest plus a wordmark.
+ *
+ * `primary` decides which name leads. Everywhere a person sees the school —
+ * the public site, the sign-in page, the dashboard sidebar — that is the
+ * school's own full name. `brand_name` is the product wordmark and stays out
+ * of the way, in tab titles and the site footer.
+ *
+ * `multiline` is for narrow columns: a full school name does not fit one line
+ * of a 16rem sidebar, and truncating a school's name to "The Holy Child
+ * Pre-…" is worse than wrapping it onto two.
+ *
+ * Both names come from Settings, so a rename reaches every surface at once.
+ */
+export function Logo({
+  className,
+  markClassName,
+  variant = 'dark',
+  showTagline = true,
+  primary = 'brand',
+  multiline = false,
+}) {
   const { school } = useSchool()
   const isLight = variant === 'light'
-  const brand = school.brand_name || SCHOOL.brand
+  const isSchoolFirst = primary === 'school'
+
   const locality = (school.address || SCHOOL.address).split(',')[1]?.trim()
+  const shortName = school.short_name || SCHOOL.shortName
+
+  const headline = isSchoolFirst ? school.name_en || SCHOOL.nameEn : school.brand_name || SCHOOL.brand
+  // Under the school's full name the Bangla name is the more useful second
+  // line; under the product wordmark it is "which school, where".
+  const tagline = isSchoolFirst
+    ? school.name_bn || [shortName, locality].filter(Boolean).join(' · ')
+    : [shortName, locality].filter(Boolean).join(' · ')
+
   return (
     <span className={cn('flex items-center gap-2.5', className)}>
       <LogoMark className={cn('h-10 w-10 shrink-0', markClassName)} />
-      <span className="min-w-0 leading-tight">
-        <span className={cn('block text-lg font-extrabold tracking-tight', isLight ? 'text-white' : 'text-brand-800')}>
-          {renderBrand(brand)}
+      <span
+        className={cn(
+          'min-w-0 leading-tight',
+          // A full school name is several times longer than a wordmark, so on
+          // a wide header it gets room to grow — and a ceiling so it can never
+          // crowd the nav.
+          isSchoolFirst && !multiline && 'max-w-[13rem] sm:max-w-sm lg:max-w-lg',
+        )}
+      >
+        <span
+          className={cn(
+            'block font-extrabold tracking-tight',
+            multiline ? 'line-clamp-2 text-[13px] leading-[1.2]' : 'truncate',
+            !multiline && (isSchoolFirst ? 'text-base lg:text-lg' : 'text-lg'),
+            isLight ? 'text-white' : 'text-brand-800',
+          )}
+          title={isSchoolFirst ? headline : undefined}
+        >
+          {renderWordmark(headline)}
         </span>
-        {showTagline ? (
-          <span className={cn('block truncate text-[11px] font-medium', isLight ? 'text-brand-100' : 'text-slate-500')}>
-            {[school.short_name || SCHOOL.shortName, locality].filter(Boolean).join(' · ')}
+        {showTagline && tagline ? (
+          <span
+            className={cn(
+              'block truncate text-[11px] font-medium',
+              isSchoolFirst && school.name_bn && 'font-bangla text-xs',
+              isLight ? 'text-brand-100' : 'text-slate-500',
+            )}
+            lang={isSchoolFirst && school.name_bn ? 'bn' : undefined}
+          >
+            {tagline}
           </span>
         ) : null}
       </span>
