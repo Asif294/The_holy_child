@@ -36,7 +36,11 @@ export function ToastProvider({ children }) {
   const push = useCallback(
     (message, { type = 'info', duration = 4500 } = {}) => {
       const id = nextId.current++
-      setToasts((current) => [...current, { id, message, type }])
+      // Newest first: the stack hangs from the top, so a new toast belongs at
+      // the top edge where the eye already is. Appending instead would push
+      // each new one further down, and dismissing the oldest would jump the
+      // rest upwards.
+      setToasts((current) => [{ id, message, type }, ...current])
       if (duration) setTimeout(() => dismiss(id), duration)
       return id
     },
@@ -58,8 +62,11 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
+      {/* Centred at the top. `top-20` clears the sticky 4rem topbar, so a toast
+          never sits over the search box, the bell or the profile menu, and the
+          padding keeps it off the screen edges on a narrow phone. */}
       <div
-        className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2 sm:bottom-6 sm:right-6"
+        className="pointer-events-none fixed left-1/2 top-20 z-[100] flex w-full max-w-sm -translate-x-1/2 flex-col gap-2 px-4 sm:px-0"
         role="region"
         aria-label="Notifications"
       >
