@@ -158,3 +158,81 @@ class AdministrationOfficeTests(APITestCase):
         self.assertEqual(
             Principal.current(Principal.Office.VICE_PRINCIPAL).full_name, "Salma Begum"
         )
+
+
+class MultipartBooleanTests(APITestCase):
+    """
+    A multipart write must not silently flip booleans it never mentioned.
+
+    DRF reads an absent boolean in an HTML form as `False` — correct for a
+    browser checkbox, wrong for an API. These endpoints take file uploads, so
+    they use `MultipartModelSerializer`; without it, creating a record with a
+    photograph attached would file it away deactivated.
+
+    DRF exempts partial updates from that rule on its own; the PATCH cases
+    below are here to keep it that way.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        sync_permissions()
+        sync_roles(DEFAULT_ROLES)
+        cls.admin = User.objects.create_user(
+            email="content@example.com",
+            password="StrongPass!2026",
+            full_name="Content Editor",
+            role=Role.objects.get(slug=ROLE_SCHOOL_ADMIN),
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(self.admin)
+
+    def test_a_multipart_create_keeps_the_model_default(self):
+        response = self.client.post(
+            reverse("v1:successful-student-list"),
+            {"academic_year": "2026", "full_name": "Nabila Haque"},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["is_active"])
+        self.assertFalse(response.data["is_featured"])
+
+    def test_a_multipart_patch_leaves_unmentioned_booleans_alone(self):
+        student = SuccessfulStudent.objects.create(
+            academic_year="2026", full_name="Nabila Haque", is_featured=True
+        )
+        response = self.client.patch(
+            reverse("v1:successful-student-detail", args=[student.pk]),
+            {"result": "GPA 5.00"},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        student.refresh_from_db()
+        self.assertTrue(student.is_active)
+        self.assertTrue(student.is_featured)
+
+    def test_a_multipart_patch_still_honours_a_boolean_it_does_send(self):
+        student = SuccessfulStudent.objects.create(academic_year="2026", full_name="Nabila Haque")
+        response = self.client.patch(
+            reverse("v1:successful-student-detail", args=[student.pk]),
+            {"is_active": "false"},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        student.refresh_from_db()
+        self.assertFalse(student.is_active)
+
+    def test_the_same_holds_for_an_administrator_profile(self):
+        principal = Principal.objects.create(full_name="Md. Abdul Karim")
+        response = self.client.patch(
+            reverse("v1:principal-detail", args=[principal.pk]),
+            {"qualification": "M.A., B.Ed."},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        principal.refresh_from_db()
+        self.assertTrue(principal.is_active)
+        self.assertTrue(principal.is_current)

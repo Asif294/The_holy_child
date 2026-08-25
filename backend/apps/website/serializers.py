@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.common.serializers import MultipartModelSerializer
 from apps.website.models import AboutSection, Achievement, HeroSlide, SuccessfulStudent
 
 
@@ -11,7 +12,7 @@ def absolute(serializer, image) -> str | None:
     return request.build_absolute_uri(image.url) if request else image.url
 
 
-class HeroSlideSerializer(serializers.ModelSerializer):
+class HeroSlideSerializer(MultipartModelSerializer):
     image_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -55,7 +56,7 @@ class AchievementPublicSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class AboutSectionSerializer(serializers.ModelSerializer):
+class AboutSectionSerializer(MultipartModelSerializer):
     image_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -90,7 +91,7 @@ class AboutPublicSerializer(serializers.ModelSerializer):
         return AchievementPublicSerializer(queryset, many=True, context=self.context).data
 
 
-class SuccessfulStudentSerializer(serializers.ModelSerializer):
+class SuccessfulStudentSerializer(MultipartModelSerializer):
     photo_url = serializers.SerializerMethodField()
 
     class Meta:

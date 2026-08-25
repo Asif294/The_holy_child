@@ -53,13 +53,26 @@ export function CrudPage({
   )
   const form = useResourceForm(fields, formRecord)
 
+  // A form with a file in it has to go out as multipart; one without stays JSON.
+  const hasFileField = useMemo(() => fields.some((field) => field.type === 'image'), [fields])
+
   const closeForm = useCallback(() => setEditing(null), [])
+
+  /** JSON by default; multipart once the form can carry a file. */
+  function bodyFor(payload) {
+    if (!hasFileField) return payload
+    const body = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) body.append(key, value)
+    })
+    return body
+  }
 
   async function handleSave(event) {
     event.preventDefault()
     setSaving(true)
     try {
-      const payload = toPayload(form.payload(), form.values)
+      const payload = bodyFor(toPayload(form.payload(), form.values))
       if (editing?.id) {
         await service.patch(editing.id, payload)
         toast.success(`${title.replace(/s$/, '')} updated.`)
@@ -199,7 +212,13 @@ export function CrudPage({
         }
       >
         <form id="crud-form" onSubmit={handleSave} noValidate>
-          <ResourceForm fields={fields} values={form.values} errors={form.errors} onChange={form.change} />
+          <ResourceForm
+            fields={fields}
+            values={form.values}
+            errors={form.errors}
+            onChange={form.change}
+            record={editing}
+          />
         </form>
       </Modal>
 

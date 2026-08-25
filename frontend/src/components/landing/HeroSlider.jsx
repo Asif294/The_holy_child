@@ -31,7 +31,6 @@ export function HeroSlider({ slides = [], stats }) {
   const count = items.length
   const goTo = useCallback((next) => setIndex(((next % count) + count) % count), [count])
   const next = useCallback(() => goTo(index + 1), [goTo, index])
-  const previous = useCallback(() => goTo(index - 1), [goTo, index])
 
   // Stepping through by hand is a request to stop the carousel, not to restart it.
   const step = useCallback(

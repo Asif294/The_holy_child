@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BadgeCheck, ClipboardCheck, FileWarning, GraduationCap, Pencil, Users } from 'lucide-react'
+import { BadgeCheck, ClipboardCheck, ExternalLink, FileWarning, GraduationCap, Pencil, Users } from 'lucide-react'
 
 import Alert from '@/components/ui/Alert'
 import Avatar from '@/components/ui/Avatar'
@@ -19,42 +19,69 @@ import useToast from '@/hooks/useToast'
 import { principalService } from '@/services'
 import { formatDate, formatNumber, humanise } from '@/utils/formatters'
 
+/** The two seats the public Administration section renders. */
+const OFFICES = [
+  { key: 'principal', label: 'Principal', description: "The head of the institution." },
+  { key: 'vice_principal', label: 'Vice Principal', description: 'Second in the administration.' },
+]
+
 const FIELDS = [
   { name: 'full_name', label: 'Full name', required: true, placeholder: 'Md. Abdul Karim' },
-  { name: 'designation', label: 'Designation', defaultValue: 'Principal' },
+  { name: 'designation', label: 'Designation', placeholder: 'Principal' },
   { name: 'email', label: 'Email', type: 'email' },
   { name: 'phone', label: 'Phone', type: 'tel' },
   { name: 'qualification', label: 'Qualification', placeholder: 'M.A. in English, B.Ed.' },
   { name: 'experience_years', label: 'Years of experience', type: 'number', min: 0, defaultValue: 0 },
   { name: 'tenure_start', label: 'Tenure start', type: 'date' },
   { name: 'tenure_end', label: 'Tenure end', type: 'date' },
-  { name: 'message', label: 'Message from the Principal', type: 'textarea', rows: 6 },
+  {
+    name: 'photo',
+    type: 'image',
+    label: 'Photograph',
+    previewKey: 'photo_url',
+    hint: 'Shown publicly on the Administration section of the home page.',
+  },
+  { name: 'message', label: 'Public message', type: 'textarea', rows: 6 },
   { name: 'biography', label: 'Biography', type: 'textarea', rows: 4 },
 ]
 
+/**
+ * The principal's office.
+ *
+ * Two seats are administered here — principal and vice principal — because
+ * both appear in the public Administration section and both are governed by
+ * the same `principal.*` permission codes. Approvals and oversight below are
+ * the office's internal work.
+ */
 export function PrincipalOffice() {
-  useDocumentTitle("Principal's Office")
+  useDocumentTitle('Administration')
 
   const toast = useToast()
   const { data, error, isLoading, refetch } = useApi(() => principalService.dashboard(), [])
 
+  // `null` closed; otherwise `{ office, record }` — a record without an id is a new one.
   const [editing, setEditing] = useState(null)
   const [isSaving, setSaving] = useState(false)
-  const form = useResourceForm(FIELDS, editing?.id ? editing : null)
-
-  const principal = data?.principal
+  const form = useResourceForm(FIELDS, editing?.record?.id ? editing.record : null)
 
   async function handleSave(event) {
     event.preventDefault()
     setSaving(true)
     try {
-      const payload = { ...form.payload(), is_current: true }
-      if (editing?.id) {
-        await principalService.patch(editing.id, payload)
-        toast.success("Principal's profile updated.")
+      const values = form.payload()
+      const photo = form.values.photo
+      const body = new FormData()
+      Object.entries({ ...values, office: editing.office, is_current: true }).forEach(([key, value]) => {
+        if (key !== 'photo' && value !== undefined && value !== null) body.append(key, value)
+      })
+      if (photo) body.append('photo', photo)
+
+      if (editing.record?.id) {
+        await principalService.patch(editing.record.id, body)
+        toast.success('Profile updated.')
       } else {
-        await principalService.create(payload)
-        toast.success('Principal recorded.')
+        await principalService.create(body)
+        toast.success('Administrator recorded.')
       }
       setEditing(null)
       refetch()
@@ -71,18 +98,14 @@ export function PrincipalOffice() {
   return (
     <div>
       <PageHeader
-        title="Principal's Office"
-        description="The head of institution — profile, public message, pending approvals and school oversight."
+        title="Administration"
+        description="The principal and vice principal — public profiles, pending approvals and school oversight."
         actions={
-          <Can permission="principal.update">
-            <Button
-              leftIcon={<Pencil className="h-4 w-4" />}
-              onClick={() => setEditing(principal ?? {})}
-              variant={principal ? 'secondary' : 'primary'}
-            >
-              {principal ? 'Edit profile' : 'Record principal'}
+          <a href="/#administration" target="_blank" rel="noreferrer">
+            <Button variant="secondary" leftIcon={<ExternalLink className="h-4 w-4" />}>
+              View the site
             </Button>
-          </Can>
+          </a>
         }
       />
 
@@ -109,69 +132,19 @@ export function PrincipalOffice() {
         <StatCard icon={Users} label="Active teachers" value={formatNumber(data?.total_teachers)} tone="violet" />
       </div>
 
+      {/* The two public profiles */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {OFFICES.map((office) => (
+          <OfficeCard
+            key={office.key}
+            office={office}
+            person={data?.[office.key]}
+            onEdit={(record) => setEditing({ office: office.key, record: record ?? {} })}
+          />
+        ))}
+      </div>
+
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        {/* Profile */}
-        <Card className="lg:col-span-2">
-          <CardHeader title="Principal" description="Shown publicly on the school's landing page." />
-          <CardBody>
-            {principal ? (
-              <div>
-                <div className="flex flex-wrap items-center gap-4">
-                  <Avatar src={principal.photo_url} name={principal.full_name} size="lg" />
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">{principal.full_name}</p>
-                    <p className="text-sm text-brand-600">{principal.designation}</p>
-                    {principal.qualification ? (
-                      <p className="mt-0.5 text-xs text-slate-500">{principal.qualification}</p>
-                    ) : null}
-                  </div>
-                  <div className="ml-auto flex flex-col items-end gap-1.5">
-                    <Badge tone="success">Sitting principal</Badge>
-                    <span className="text-xs text-slate-500">
-                      Since {formatDate(principal.tenure_start)}
-                    </span>
-                  </div>
-                </div>
-
-                <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-100 pt-5 text-sm sm:grid-cols-3">
-                  {[
-                    ['Email', principal.email || '—'],
-                    ['Phone', principal.phone || '—'],
-                    ['Experience', `${principal.experience_years ?? 0} years`],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-                      <dd className="mt-0.5 text-slate-800">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-
-                {principal.message ? (
-                  <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Message from the Principal
-                    </p>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">
-                      {principal.message}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <EmptyState
-                icon={BadgeCheck}
-                title="No principal recorded"
-                description="Record the sitting principal so their message appears on the public site."
-                action={
-                  <Can permission="principal.update">
-                    <Button onClick={() => setEditing({})}>Record principal</Button>
-                  </Can>
-                }
-              />
-            )}
-          </CardBody>
-        </Card>
-
         {/* Pending approvals by category */}
         <Card>
           <CardHeader title="Approvals awaiting a decision" />
@@ -190,37 +163,41 @@ export function PrincipalOffice() {
             )}
           </ul>
         </Card>
-      </div>
 
-      {/* Recent approvals */}
-      <Card className="mt-4">
-        <CardHeader title="Recent approval requests" />
-        <ul className="divide-y divide-slate-100">
-          {(data?.recent_approvals ?? []).length === 0 ? (
-            <li>
-              <EmptyState icon={ClipboardCheck} title="No requests yet" className="py-10" />
-            </li>
-          ) : (
-            data.recent_approvals.map((approval) => (
-              <li key={approval.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800">{approval.title}</p>
-                  <p className="text-xs text-slate-500">
-                    {approval.category_display} · {approval.requested_by_name ?? 'Unknown'} ·{' '}
-                    {formatDate(approval.created_at)}
-                  </p>
-                </div>
-                <StatusBadge status={approval.status} label={approval.status_display} />
+        {/* Recent approvals */}
+        <Card className="lg:col-span-2">
+          <CardHeader title="Recent approval requests" />
+          <ul className="divide-y divide-slate-100">
+            {(data?.recent_approvals ?? []).length === 0 ? (
+              <li>
+                <EmptyState icon={ClipboardCheck} title="No requests yet" className="py-10" />
               </li>
-            ))
-          )}
-        </ul>
-      </Card>
+            ) : (
+              data.recent_approvals.map((approval) => (
+                <li key={approval.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">{approval.title}</p>
+                    <p className="text-xs text-slate-500">
+                      {approval.category_display} · {approval.requested_by_name ?? 'Unknown'} ·{' '}
+                      {formatDate(approval.created_at)}
+                    </p>
+                  </div>
+                  <StatusBadge status={approval.status} label={approval.status_display} />
+                </li>
+              ))
+            )}
+          </ul>
+        </Card>
+      </div>
 
       <Modal
         isOpen={editing !== null}
         onClose={() => setEditing(null)}
-        title={editing?.id ? "Edit the principal's profile" : 'Record the principal'}
+        title={
+          editing?.record?.id
+            ? `Edit the ${OFFICES.find((office) => office.key === editing.office)?.label.toLowerCase()}'s profile`
+            : `Record the ${OFFICES.find((office) => office.key === editing?.office)?.label.toLowerCase() ?? 'administrator'}`
+        }
         size="lg"
         footer={
           <div className="flex justify-end gap-2">
@@ -234,10 +211,94 @@ export function PrincipalOffice() {
         }
       >
         <form id="principal-form" onSubmit={handleSave} noValidate>
-          <ResourceForm fields={FIELDS} values={form.values} errors={form.errors} onChange={form.change} />
+          <ResourceForm
+            fields={FIELDS}
+            values={form.values}
+            errors={form.errors}
+            onChange={form.change}
+            record={editing?.record}
+          />
         </form>
       </Modal>
     </div>
+  )
+}
+
+function OfficeCard({ office, person, onEdit }) {
+  return (
+    <Card>
+      <CardHeader
+        title={office.label}
+        description="Shown publicly in the Administration section of the home page."
+        action={
+          <Can permission="principal.update">
+            <Button
+              size="sm"
+              variant={person ? 'secondary' : 'primary'}
+              leftIcon={<Pencil className="h-3.5 w-3.5" />}
+              onClick={() => onEdit(person)}
+            >
+              {person ? 'Edit' : 'Record'}
+            </Button>
+          </Can>
+        }
+      />
+      <CardBody>
+        {person ? (
+          <div>
+            <div className="flex flex-wrap items-center gap-4">
+              <Avatar src={person.photo_url} name={person.full_name} size="lg" />
+              <div className="min-w-0">
+                <p className="truncate text-lg font-semibold text-slate-900">{person.full_name}</p>
+                <p className="text-sm text-brand-600">{person.designation || person.office_display}</p>
+                {person.qualification ? (
+                  <p className="mt-0.5 text-xs text-slate-500">{person.qualification}</p>
+                ) : null}
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-1.5">
+                <Badge tone="success">In office</Badge>
+                {person.tenure_start ? (
+                  <span className="text-xs text-slate-500">Since {formatDate(person.tenure_start)}</span>
+                ) : null}
+              </div>
+            </div>
+
+            <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-100 pt-5 text-sm sm:grid-cols-3">
+              {[
+                ['Email', person.email || '—'],
+                ['Phone', person.phone || '—'],
+                ['Experience', `${person.experience_years ?? 0} years`],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
+                  <dd className="mt-0.5 truncate text-slate-800">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {person.message ? (
+              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Public message</p>
+                <p className="mt-2 line-clamp-4 whitespace-pre-line text-sm leading-relaxed text-slate-700">
+                  {person.message}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <EmptyState
+            icon={BadgeCheck}
+            title={`No ${office.label.toLowerCase()} recorded`}
+            description={`${office.description} Record them so their profile appears on the public site.`}
+            action={
+              <Can permission="principal.update">
+                <Button onClick={() => onEdit(null)}>Record {office.label.toLowerCase()}</Button>
+              </Can>
+            }
+          />
+        )}
+      </CardBody>
+    </Card>
   )
 }
 

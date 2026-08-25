@@ -25,11 +25,11 @@ const vite = await createServer({ server: { middlewareMode: true }, appType: 'cu
 const { MemoryRouter } = await import('react-router-dom')
 const { AuthProvider } = await vite.ssrLoadModule('/src/context/AuthContext.jsx')
 const { ToastProvider } = await vite.ssrLoadModule('/src/context/ToastContext.jsx')
+const { SchoolProvider } = await vite.ssrLoadModule('/src/context/SchoolContext.jsx')
 
 const SCREENS = [
   ['Landing', '/src/pages/Landing.jsx'],
   ['Login', '/src/pages/auth/Login.jsx'],
-  ['Register', '/src/pages/auth/Register.jsx'],
   ['Dashboard', '/src/pages/dashboard/Dashboard.jsx'],
   ['Students', '/src/pages/academics/Students.jsx'],
   ['Teachers', '/src/pages/academics/Teachers.jsx'],
@@ -38,6 +38,10 @@ const SCREENS = [
   ['Attendance', '/src/pages/academics/Attendance.jsx'],
   ['Exams', '/src/pages/academics/Exams.jsx'],
   ['Results', '/src/pages/academics/Results.jsx'],
+  ['HeroSlides', '/src/pages/website/HeroSlides.jsx'],
+  ['AboutPage', '/src/pages/website/AboutPage.jsx'],
+  ['Achievements', '/src/pages/website/Achievements.jsx'],
+  ['SuccessfulStudents', '/src/pages/website/SuccessfulStudentsAdmin.jsx'],
   ['PrincipalOffice', '/src/pages/principal/PrincipalOffice.jsx'],
   ['Notices', '/src/pages/principal/Notices.jsx'],
   ['Approvals', '/src/pages/principal/Approvals.jsx'],
@@ -61,6 +65,8 @@ for (const [name, path] of SCREENS) {
   try {
     const mod = await vite.ssrLoadModule(path)
     const Component = mod.default ?? Object.values(mod).find((v) => typeof v === 'function')
+    // Same provider stack as `App.jsx`, so a screen that reads any context
+    // renders here exactly as it does in the browser.
     const html = renderToString(
       React.createElement(
         MemoryRouter,
@@ -68,7 +74,11 @@ for (const [name, path] of SCREENS) {
         React.createElement(
           ToastProvider,
           null,
-          React.createElement(AuthProvider, null, React.createElement(Component)),
+          React.createElement(
+            SchoolProvider,
+            null,
+            React.createElement(AuthProvider, null, React.createElement(Component)),
+          ),
         ),
       ),
     )

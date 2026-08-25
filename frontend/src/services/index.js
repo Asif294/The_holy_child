@@ -4,7 +4,7 @@ import { createCrudService } from './crudService'
 /**
  * Builds a multipart body from plain values plus a set of files.
  *
- * DRF reads a file only from `multipart/form-data`, and a `null` file means
+ * DRF reads a file only from `multipart/form-data`, and an absent file means
  * "leave whatever is already stored alone" — so an unset file is omitted from
  * the body rather than sent as an empty string, which would clear it.
  */
@@ -179,32 +179,11 @@ export const approvalService = {
 }
 
 /* --- Public website content ------------------------------------------------ */
-export const heroSlideService = {
-  ...createCrudService('hero-slides'),
-  /** Slides carry an image file, so writes go out as multipart. */
-  async createWithImage(values, imageFile) {
-    const { data } = await api.post('/hero-slides/', toFormData(values, { image: imageFile }))
-    return data
-  },
-  async updateWithImage(id, values, imageFile) {
-    const { data } = await api.patch(`/hero-slides/${id}/`, toFormData(values, { image: imageFile }))
-    return data
-  },
-}
-
+// Both of these carry an image. The CRUD screens build the multipart body
+// themselves (see `CrudPage`), so the plain factory is all they need here.
+export const heroSlideService = createCrudService('hero-slides')
 export const achievementService = createCrudService('achievements')
-
-export const successfulStudentService = {
-  ...createCrudService('successful-students'),
-  async createWithPhoto(values, photoFile) {
-    const { data } = await api.post('/successful-students/', toFormData(values, { photo: photoFile }))
-    return data
-  },
-  async updateWithPhoto(id, values, photoFile) {
-    const { data } = await api.patch(`/successful-students/${id}/`, toFormData(values, { photo: photoFile }))
-    return data
-  },
-}
+export const successfulStudentService = createCrudService('successful-students')
 
 export const aboutService = {
   async retrieve() {

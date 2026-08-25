@@ -6,29 +6,27 @@ import useSchool from '@/hooks/useSchool'
 
 const COLUMNS = [
   {
-    title: 'Platform',
+    title: 'The school',
     links: [
-      { label: 'Features', href: '#features' },
-      { label: 'Dashboard', href: '#about' },
-      { label: 'Get Started', to: '/register' },
-      { label: 'Login', to: '/login' },
+      { label: 'About us', href: '#about' },
+      { label: 'Administration', href: '#administration' },
+      { label: 'Our teachers', href: '#teachers' },
+      { label: 'Successful students', href: '#results' },
     ],
   },
   {
-    title: 'School',
+    title: 'Visit',
     links: [
-      { label: 'About', href: '#about' },
       { label: 'Contact', href: '#contact' },
       { label: 'Admissions', href: '#contact' },
       { label: 'Notices', href: '#contact' },
     ],
   },
   {
-    title: 'Legal',
-    links: [
-      { label: 'Privacy Policy', href: '#' },
-      { label: 'Terms of Service', href: '#' },
-    ],
+    // Staff only. Accounts are issued by the office, so there is nothing to
+    // link a visitor to here beyond the sign-in page itself.
+    title: 'Staff',
+    links: [{ label: 'Admin sign-in', to: '/login' }],
   },
 ]
 

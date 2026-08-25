@@ -1,10 +1,11 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.common.serializers import MultipartModelSerializer
 from apps.principal.models import ApprovalRequest, Notice, Principal
 
 
-class PrincipalSerializer(serializers.ModelSerializer):
+class PrincipalSerializer(MultipartModelSerializer):
     photo_url = serializers.SerializerMethodField()
     signature_url = serializers.SerializerMethodField()
     office_display = serializers.CharField(source="get_office_display", read_only=True)

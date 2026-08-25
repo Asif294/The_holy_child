@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.common.serializers import MultipartModelSerializer
 from apps.teachers.models import Department, Designation, Teacher
 
 
@@ -51,7 +52,7 @@ class TeacherListSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url
 
 
-class TeacherSerializer(serializers.ModelSerializer):
+class TeacherSerializer(MultipartModelSerializer):
     """Full teacher record, including the subjects they are qualified to teach."""
 
     designation_name = serializers.CharField(source="designation.name", read_only=True, default=None)
