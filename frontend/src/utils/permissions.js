@@ -24,6 +24,13 @@ export const P = {
   admission: { view: 'admission.view', create: 'admission.create' },
   notice: { view: 'notice.view', create: 'notice.create', update: 'notice.update', delete: 'notice.delete' },
   principal: { view: 'principal.view', update: 'principal.update', approve: 'principal.approve' },
+  content: { view: 'content.view', create: 'content.create', update: 'content.update', delete: 'content.delete' },
+  achiever: {
+    view: 'achiever.view',
+    create: 'achiever.create',
+    update: 'achiever.update',
+    delete: 'achiever.delete',
+  },
   report: { view: 'report.view', export: 'report.export' },
   user: { view: 'user.view', create: 'user.create', update: 'user.update', delete: 'user.delete' },
   role: { view: 'role.view', create: 'role.create', update: 'role.update', delete: 'role.delete' },

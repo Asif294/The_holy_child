@@ -1,8 +1,12 @@
 import api, { tokenStore } from './api'
 
 export const authService = {
-  async login({ email, password }) {
-    const { data } = await api.post('/auth/login/', { email, password }, { skipAuth: true })
+  /**
+   * `identifier` is an email address, a phone number or a username — the API
+   * works out which. The form asks for one thing, so this takes one thing.
+   */
+  async login({ identifier, password }) {
+    const { data } = await api.post('/auth/login/', { identifier, password }, { skipAuth: true })
     tokenStore.set({ access: data.access, refresh: data.refresh })
     return data
   },

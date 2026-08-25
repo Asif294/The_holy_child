@@ -1,7 +1,10 @@
 from django.db.models import Count, Q
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.common.schema import PROTECTED_RESPONSES, crud_schema
 from apps.common.viewsets import RBACModelViewSet
@@ -10,6 +13,7 @@ from apps.teachers.serializers import (
     DepartmentSerializer,
     DesignationSerializer,
     TeacherListSerializer,
+    TeacherPublicSerializer,
     TeacherSerializer,
 )
 
@@ -69,6 +73,7 @@ class TeacherViewSet(RBACModelViewSet):
     permission_module = "teacher"
     permission_map = {"statistics": "teacher.view", "my_profile": "teacher.view"}
     serializer_class = TeacherSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     search_fields = ["full_name", "employee_id", "email", "phone", "specialization"]
     ordering_fields = ["full_name", "joining_date", "created_at"]
     ordering = ["full_name"]
@@ -136,3 +141,49 @@ class TeacherViewSet(RBACModelViewSet):
                 status=404,
             )
         return Response(self.get_serializer(teacher).data)
+
+
+@extend_schema(
+    tags=["Public site"],
+    summary="Public staff directory",
+    description=(
+        "Unauthenticated endpoint powering the *Teachers* section of the public "
+        "site. Lists active teaching staff with the fields a visitor should see — "
+        "photo, name, designation, department, subjects and qualification. "
+        "Personal contact details are never included.\n\n"
+        "Adding, editing and deleting teachers stays behind the `teacher.*` "
+        "permission codes on `/api/v1/teachers/`."
+    ),
+    parameters=[
+        OpenApiParameter("department", int, description="Filter to one department."),
+        OpenApiParameter("search", str, description="Match against name, designation or specialisation."),
+    ],
+    responses={200: TeacherPublicSerializer(many=True)},
+)
+class PublicTeacherAPIView(APIView):
+    """Read-only public directory of the teaching staff."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        queryset = (
+            Teacher.objects.filter(is_deleted=False, is_active=True, status=Teacher.Status.ACTIVE)
+            .select_related("designation", "department")
+            .prefetch_related("subjects")
+            .order_by("designation__rank", "full_name")
+        )
+
+        department = (request.query_params.get("department") or "").strip()
+        if department.isdigit():
+            queryset = queryset.filter(department_id=int(department))
+
+        search = (request.query_params.get("search") or "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(full_name__icontains=search)
+                | Q(designation__name__icontains=search)
+                | Q(specialization__icontains=search)
+            )
+
+        return Response(TeacherPublicSerializer(queryset, many=True, context={"request": request}).data)

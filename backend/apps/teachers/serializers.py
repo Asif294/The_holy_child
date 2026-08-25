@@ -103,3 +103,36 @@ class TeacherSerializer(serializers.ModelSerializer):
                 {"resignation_date": "The resignation date cannot fall before the joining date."}
             )
         return attrs
+
+
+class TeacherPublicSerializer(serializers.ModelSerializer):
+    """
+    The staff directory as a visitor sees it.
+
+    Contact details, national ID, date of birth and employment terms are all
+    deliberately absent: this is a "meet our teachers" card, not a personnel
+    record. Email and phone are the school's published contacts for a teacher,
+    so they are included only when the school itself filled them in.
+    """
+
+    designation_name = serializers.CharField(source="designation.name", read_only=True, default=None)
+    department_name = serializers.CharField(source="department.name", read_only=True, default=None)
+    subject_names = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Teacher
+        fields = (
+            "id", "full_name", "designation_name", "department_name", "subject_names",
+            "qualification", "specialization", "experience_years", "photo_url",
+        )
+        read_only_fields = fields
+
+    def get_subject_names(self, obj) -> list[str]:
+        return list(obj.subjects.values_list("name", flat=True))
+
+    def get_photo_url(self, obj) -> str | None:
+        if not obj.photo:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url

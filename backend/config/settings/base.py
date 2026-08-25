@@ -78,6 +78,7 @@ LOCAL_APPS = [
     "apps.fees",
     "apps.exams",
     "apps.dashboard",
+    "apps.website",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -145,7 +146,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    "apps.accounts.backends.EmailOrUsernameBackend",
+    "apps.accounts.backends.EmailPhoneOrUsernameBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 

@@ -5,6 +5,7 @@ from apps.principal.views import (
     ApprovalRequestViewSet,
     NoticeViewSet,
     PrincipalViewSet,
+    PublicAdministrationAPIView,
     PublicPrincipalViewSet,
 )
 
@@ -14,4 +15,7 @@ router.register("notices", NoticeViewSet, basename="notice")
 router.register("approval-requests", ApprovalRequestViewSet, basename="approval-request")
 router.register("public/principal", PublicPrincipalViewSet, basename="public-principal")
 
-urlpatterns = [path("", include(router.urls))]
+urlpatterns = [
+    path("public/administration/", PublicAdministrationAPIView.as_view(), name="public-administration"),
+    path("", include(router.urls)),
+]

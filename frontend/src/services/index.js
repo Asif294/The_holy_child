@@ -1,6 +1,24 @@
 import api from './api'
 import { createCrudService } from './crudService'
 
+/**
+ * Builds a multipart body from plain values plus a set of files.
+ *
+ * DRF reads a file only from `multipart/form-data`, and a `null` file means
+ * "leave whatever is already stored alone" — so an unset file is omitted from
+ * the body rather than sent as an empty string, which would clear it.
+ */
+function toFormData(values, files = {}) {
+  const form = new FormData()
+  Object.entries(values ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) form.append(key, value)
+  })
+  Object.entries(files).forEach(([key, file]) => {
+    if (file) form.append(key, file)
+  })
+  return form
+}
+
 /* --- Access control ------------------------------------------------------ */
 export const userService = {
   ...createCrudService('users'),
@@ -125,8 +143,9 @@ export const paymentService = {
 /* --- Principal's office --------------------------------------------------- */
 export const principalService = {
   ...createCrudService('principals'),
-  async current() {
-    const { data } = await api.get('/principals/current/')
+  /** Omit `office` for `{ principal, vice_principal }`; pass one for a single record. */
+  async current(office) {
+    const { data } = await api.get('/principals/current/', { params: office ? { office } : {} })
     return data
   },
   async dashboard() {
@@ -156,6 +175,84 @@ export const approvalService = {
   async mine(params = {}) {
     const { data } = await api.get('/approval-requests/mine/', { params })
     return data
+  },
+}
+
+/* --- Public website content ------------------------------------------------ */
+export const heroSlideService = {
+  ...createCrudService('hero-slides'),
+  /** Slides carry an image file, so writes go out as multipart. */
+  async createWithImage(values, imageFile) {
+    const { data } = await api.post('/hero-slides/', toFormData(values, { image: imageFile }))
+    return data
+  },
+  async updateWithImage(id, values, imageFile) {
+    const { data } = await api.patch(`/hero-slides/${id}/`, toFormData(values, { image: imageFile }))
+    return data
+  },
+}
+
+export const achievementService = createCrudService('achievements')
+
+export const successfulStudentService = {
+  ...createCrudService('successful-students'),
+  async createWithPhoto(values, photoFile) {
+    const { data } = await api.post('/successful-students/', toFormData(values, { photo: photoFile }))
+    return data
+  },
+  async updateWithPhoto(id, values, photoFile) {
+    const { data } = await api.patch(`/successful-students/${id}/`, toFormData(values, { photo: photoFile }))
+    return data
+  },
+}
+
+export const aboutService = {
+  async retrieve() {
+    const { data } = await api.get('/website/about/')
+    return data
+  },
+  async update(values, imageFile) {
+    if (!imageFile) {
+      const { data } = await api.patch('/website/about/', values)
+      return data
+    }
+    const { data } = await api.patch('/website/about/', toFormData(values, { image: imageFile }))
+    return data
+  },
+}
+
+/**
+ * Everything the landing page reads.
+ *
+ * These are the only calls in the app that skip the Authorization header: the
+ * public site must render identically for a visitor with no session and for a
+ * head teacher who is signed in.
+ */
+export const publicSiteService = {
+  async heroSlides() {
+    const { data } = await api.get('/public/hero-slides/', { skipAuth: true })
+    return Array.isArray(data) ? data : []
+  },
+  async about() {
+    const { data } = await api.get('/public/about/', { skipAuth: true })
+    return data
+  },
+  async teachers(params = {}) {
+    const { data } = await api.get('/public/teachers/', { params, skipAuth: true })
+    return Array.isArray(data) ? data : []
+  },
+  async administration() {
+    const { data } = await api.get('/public/administration/', { skipAuth: true })
+    return data ?? { principal: null, vice_principal: null }
+  },
+  async successfulStudents(year) {
+    const params = year && year !== 'all' ? { year } : {}
+    const { data } = await api.get('/public/successful-students/', { params, skipAuth: true })
+    return Array.isArray(data) ? data : []
+  },
+  async achievementYears() {
+    const { data } = await api.get('/public/successful-students/years/', { skipAuth: true })
+    return Array.isArray(data) ? data : []
   },
 }
 

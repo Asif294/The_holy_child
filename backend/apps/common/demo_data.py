@@ -20,6 +20,7 @@ from apps.principal.models import ApprovalRequest, Notice, Principal
 from apps.students.models import Guardian, Student
 from apps.subjects.models import ClassSubject, Subject
 from apps.teachers.models import Department, Designation, Teacher
+from apps.website.models import AboutSection, Achievement, SuccessfulStudent
 
 CLASSES = [
     ("Play Group", "প্লে-গ্রুপ", "PG", 1), ("Nursery", "নার্সারি", "NUR", 2),
@@ -136,12 +137,13 @@ def load_demo_data() -> dict:
                 defaults={"teacher": random.choice(teachers[1:]), "weekly_periods": random.randint(3, 6)},
             )
 
-    # --- Principal ----------------------------------------------------- #
+    # --- Administration -------------------------------------------------- #
     principal_teacher = teachers[0]
     Principal.objects.get_or_create(
         full_name=principal_teacher.full_name,
         defaults={
             "teacher": principal_teacher,
+            "office": Principal.Office.PRINCIPAL,
             "designation": "Principal",
             "email": "principal@holychildschool.edu.bd",
             "phone": "01700000001",
@@ -158,6 +160,96 @@ def load_demo_data() -> dict:
             ),
         },
     )
+
+    vice_principal_teacher = teachers[1]
+    Principal.objects.get_or_create(
+        full_name=vice_principal_teacher.full_name,
+        defaults={
+            "teacher": vice_principal_teacher,
+            "office": Principal.Office.VICE_PRINCIPAL,
+            "designation": "Vice Principal",
+            "email": "viceprincipal@holychildschool.edu.bd",
+            "phone": "01700000002",
+            "qualification": "M.Sc. in Mathematics, B.Ed.",
+            "experience_years": 15,
+            "tenure_start": date(2012, 1, 1),
+            "is_current": True,
+            "message": (
+                "The academic side of the school is my daily responsibility — routines, "
+                "examinations, discipline and the day-to-day support our teachers need. "
+                "My door is open to any guardian who wants to talk about their child."
+            ),
+        },
+    )
+
+    # --- Public website content ------------------------------------------ #
+    AboutSection.objects.get_or_create(
+        pk=1,
+        defaults={
+            "headline": "A school built for the children of Longorpara",
+            "motto": "Discipline · Knowledge · Character",
+            "summary": (
+                "The Holy Child Pre-Cadet & High School teaches from Play Group through "
+                "Class 10 on a single campus in Longorpara, Sribordi. Small classes, a "
+                "settled teaching staff and a routine every child can rely on."
+            ),
+            "history": (
+                "The school opened in 2006 with three rooms and forty children. Two "
+                "decades on it teaches over a thousand pupils across twelve classes, "
+                "with a science block, a library and a playing field added along the way "
+                "— each built as the community raised the money for it."
+            ),
+            "mission": (
+                "To give every child in our area a disciplined, caring and modern "
+                "education, whatever their family can afford, and to send them on to "
+                "the next stage of their lives ready for it."
+            ),
+            "vision": (
+                "To be the school families in Sherpur choose first — known for results, "
+                "for the character of its students, and for teachers who stay."
+            ),
+        },
+    )
+
+    for title, year, metric, description in [
+        ("100% pass rate in the SSC examination", "2025", "100%",
+         "Every candidate the school entered passed, with thirty-one securing GPA 5.00."),
+        ("District champions, inter-school football", "2024", "1st",
+         "The under-16 team took the district title for the second year running."),
+        ("Talentpool scholarships", "2024", "12",
+         "Twelve pupils earned talentpool scholarships at the primary and junior levels."),
+        ("Science fair — divisional runners-up", "2023", "2nd",
+         "A Class 9 project on low-cost water filtration placed second at the divisional fair."),
+    ]:
+        Achievement.objects.get_or_create(
+            title=title, defaults={"year": year, "metric": metric, "description": description}
+        )
+
+    honours = [
+        ("2025", "Ayesha Siddika", "Class 10", "SSC", "GPA 5.00", Decimal("5.00"), "Talentpool scholarship", True),
+        ("2025", "Tanvir Hasan", "Class 10", "SSC", "GPA 5.00", Decimal("5.00"), "School topper", True),
+        ("2025", "Mim Akter", "Class 10", "SSC", "GPA 4.94", Decimal("4.94"), "", False),
+        ("2025", "Rakibul Islam", "Class 8", "JSC", "GPA 5.00", Decimal("5.00"), "General scholarship", False),
+        ("2024", "Sumaiya Khatun", "Class 10", "SSC", "GPA 5.00", Decimal("5.00"), "School topper", True),
+        ("2024", "Imran Hossain", "Class 10", "SSC", "GPA 4.89", Decimal("4.89"), "", False),
+        ("2024", "Fatema Begum", "Class 5", "PSC", "GPA 5.00", Decimal("5.00"), "Talentpool scholarship", False),
+        ("2023", "Sohel Rana", "Class 10", "SSC", "GPA 4.96", Decimal("4.96"), "School topper", True),
+        ("2023", "Afsana Mimi", "Class 8", "JSC", "GPA 5.00", Decimal("5.00"), "", False),
+    ]
+    for index, (year, name, klass, exam, result, gpa, achievement, featured) in enumerate(honours):
+        SuccessfulStudent.objects.get_or_create(
+            academic_year=year,
+            full_name=name,
+            defaults={
+                "student_class": klass,
+                "exam_name": exam,
+                "result": result,
+                "gpa": gpa,
+                "achievement": achievement,
+                "is_featured": featured,
+                "order": index,
+            },
+        )
 
     # --- Students and guardians ---------------------------------------- #
     students = []
@@ -354,4 +446,6 @@ def load_demo_data() -> dict:
         "attendance": attendance_rows,
         "invoices": invoices,
         "results": results,
+        "achievements": Achievement.objects.count(),
+        "honours": SuccessfulStudent.objects.count(),
     }

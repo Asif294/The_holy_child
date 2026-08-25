@@ -4,6 +4,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from apps.accounts.models import Role, User
+from apps.accounts.utils import validate_phone_value
 
 
 class UserRoleBriefSerializer(serializers.ModelSerializer):
@@ -117,6 +118,10 @@ class UserWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This username is already taken.")
         return value
 
+    def validate_phone(self, value: str) -> str:
+        # Unique, because the login form accepts a phone number as the identifier.
+        return validate_phone_value(value, instance=self.instance)
+
     def validate_password(self, value: str) -> str:
         try:
             validate_password(value)
@@ -156,6 +161,9 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("full_name", "phone", "gender", "date_of_birth", "address", "profile_image")
+
+    def validate_phone(self, value: str) -> str:
+        return validate_phone_value(value, instance=self.instance)
 
     def to_representation(self, instance):
         return UserSerializer(instance, context=self.context).data

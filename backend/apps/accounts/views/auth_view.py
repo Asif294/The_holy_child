@@ -6,8 +6,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.serializers import (
     ChangePasswordSerializer,
@@ -19,6 +18,7 @@ from apps.accounts.serializers import (
     RegisterSerializer,
     UserCompactSerializer,
     UserSerializer,
+    token_pair_for,
 )
 from apps.common.schema import UNAUTHORIZED, VALIDATION_ERROR
 from apps.common.serializers import MessageResponseSerializer
@@ -28,10 +28,8 @@ logger = logging.getLogger(__name__)
 
 def issue_tokens(user, context=None) -> dict:
     """Mint a refresh/access pair and bundle the caller's identity with it."""
-    refresh = RefreshToken.for_user(user)
     return {
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
+        **token_pair_for(user),
         "user": UserCompactSerializer(user, context=context or {}).data,
     }
 
@@ -89,7 +87,9 @@ class RegisterAPIView(GenericAPIView):
     tags=["Authentication"],
     summary="Log in and obtain a JWT pair",
     description=(
-        "Authenticates with email (or username) and password.\n\n"
+        "Authenticates with **email address, phone number or username** in the "
+        "single `identifier` field, plus the password. `email`, `phone` and "
+        "`username` are accepted as aliases for `identifier`.\n\n"
         "The response embeds the user's role and the full list of permission codes "
         "so the client can build its navigation without a second round trip."
     ),
@@ -101,8 +101,13 @@ class RegisterAPIView(GenericAPIView):
     },
     examples=[
         OpenApiExample(
-            "Login request",
-            value={"email": "admin@holychildschool.edu.bd", "password": "••••••••"},
+            "Login with an email address",
+            value={"identifier": "admin@holychildschool.edu.bd", "password": "••••••••"},
+            request_only=True,
+        ),
+        OpenApiExample(
+            "Login with a phone number",
+            value={"identifier": "01700000000", "password": "••••••••"},
             request_only=True,
         ),
         OpenApiExample(
@@ -122,10 +127,22 @@ class RegisterAPIView(GenericAPIView):
         ),
     ],
 )
-class LoginAPIView(TokenObtainPairView):
+class LoginAPIView(GenericAPIView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
+    www_authenticate_realm = "api"
+
+    def get_authenticate_header(self, request) -> str:
+        # The view runs without authenticators, and DRF downgrades an
+        # AuthenticationFailed to 403 unless the view can name a challenge.
+        # Bad credentials on the login endpoint are a 401, so name one.
+        return f'Bearer realm="{self.www_authenticate_realm}"'
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
 @extend_schema(

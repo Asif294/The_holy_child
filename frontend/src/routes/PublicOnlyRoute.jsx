@@ -3,7 +3,13 @@ import { Navigate, Outlet } from 'react-router-dom'
 import useAuth from '@/hooks/useAuth'
 import { LoadingState } from '@/components/ui/Spinner'
 
-/** Keeps an already-signed-in user off the login and register screens. */
+/**
+ * Keeps an already-signed-in user off the login screen.
+ *
+ * They land on the school's home page rather than the dashboard: the public
+ * site is the front door for everyone, and the dashboard is one click on from
+ * there for whoever has the permissions to use it.
+ */
 export function PublicOnlyRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuth()
 
@@ -15,7 +21,7 @@ export function PublicOnlyRoute({ children }) {
     )
   }
 
-  if (isAuthenticated) return <Navigate to="/app" replace />
+  if (isAuthenticated) return <Navigate to="/" replace />
 
   return children ?? <Outlet />
 }

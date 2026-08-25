@@ -1,9 +1,11 @@
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from apps.common.schema import DETAIL_WRITE_RESPONSES, PROTECTED_RESPONSES, crud_schema
@@ -51,25 +53,47 @@ class PrincipalViewSet(RBACModelViewSet):
         "dashboard": "principal.view",
     }
     serializer_class = PrincipalSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     search_fields = ["full_name", "designation", "email", "phone"]
     ordering_fields = ["tenure_start", "full_name"]
-    filterset_fields = ["is_current", "is_active"]
+    filterset_fields = ["office", "is_current", "is_active"]
 
     def get_queryset(self):
         return Principal.objects.filter(is_deleted=False).select_related("user", "teacher")
 
     @extend_schema(
         tags=["Principal"],
-        summary="The sitting principal",
-        description="Returns the record currently flagged `is_current`, or `null` if none is set.",
+        summary="The sitting administration",
+        description=(
+            "Returns the records currently flagged `is_current`, one per office. "
+            "Pass `?office=vice_principal` for a single seat."
+        ),
+        parameters=[
+            OpenApiParameter(
+                "office", str, description="`principal` or `vice_principal`. Omit for both."
+            )
+        ],
         responses={200: PrincipalSerializer, **PROTECTED_RESPONSES},
     )
     @action(detail=False, methods=["get"], url_path="current")
     def current(self, request):
-        principal = self.get_queryset().filter(is_current=True).first()
-        if principal is None:
-            return Response({"success": True, "data": None, "message": "No sitting principal has been recorded."})
-        return Response(self.get_serializer(principal).data)
+        queryset = self.get_queryset().filter(is_current=True)
+        office = (request.query_params.get("office") or "").strip()
+
+        if office:
+            record = queryset.filter(office=office).first()
+            if record is None:
+                return Response({"success": True, "data": None, "message": f"No sitting {office} has been recorded."})
+            return Response(self.get_serializer(record).data)
+
+        by_office = {record.office: self.get_serializer(record).data for record in queryset}
+        return Response(
+            {
+                "success": True,
+                "principal": by_office.get(Principal.Office.PRINCIPAL),
+                "vice_principal": by_office.get(Principal.Office.VICE_PRINCIPAL),
+            }
+        )
 
     @extend_schema(
         tags=["Principal"],
@@ -88,13 +112,14 @@ class PrincipalViewSet(RBACModelViewSet):
         from apps.teachers.models import Teacher
 
         pending = ApprovalRequest.objects.filter(is_deleted=False, status=ApprovalRequest.Status.PENDING)
+        sitting = {
+            record.office: PrincipalSerializer(record, context=self.get_serializer_context()).data
+            for record in self.get_queryset().filter(is_current=True)
+        }
         return Response(
             {
-                "principal": PrincipalSerializer(
-                    self.get_queryset().filter(is_current=True).first(), context=self.get_serializer_context()
-                ).data
-                if self.get_queryset().filter(is_current=True).exists()
-                else None,
+                "principal": sitting.get(Principal.Office.PRINCIPAL),
+                "vice_principal": sitting.get(Principal.Office.VICE_PRINCIPAL),
                 "pending_approvals": pending.count(),
                 "pending_by_category": list(
                     pending.values("category").annotate(total=Count("id")).order_by("-total")
@@ -138,7 +163,13 @@ class PrincipalViewSet(RBACModelViewSet):
     ],
 )
 class PublicPrincipalViewSet(ReadOnlyModelViewSet):
-    """Read-only public view of the sitting principal."""
+    """
+    Read-only public view of the sitting principal.
+
+    Kept for the *Message from the Principal* block, which only ever wants the
+    one record. The Administration section uses
+    :class:`PublicAdministrationAPIView` instead, which returns both seats.
+    """
 
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -146,13 +177,71 @@ class PublicPrincipalViewSet(ReadOnlyModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return Principal.objects.filter(is_deleted=False, is_active=True, is_current=True)
+        return Principal.objects.filter(
+            is_deleted=False, is_active=True, is_current=True, office=Principal.Office.PRINCIPAL
+        )
 
     def list(self, request, *args, **kwargs):
         principal = self.get_queryset().first()
         if principal is None:
             return Response({"success": True, "data": None})
         return Response({"success": True, "data": self.get_serializer(principal).data})
+
+
+@extend_schema(
+    tags=["Public site"],
+    summary="Public administration profiles",
+    description=(
+        "Unauthenticated endpoint powering the *Administration* section of the "
+        "public site: the sitting principal and vice principal, each `null` when "
+        "no one has been recorded. Exposes only presentation fields — never "
+        "contact details, tenure dates or internal flags."
+    ),
+    responses={
+        200: OpenApiResponse(
+            response=PrincipalPublicSerializer,
+            description="An object with `principal` and `vice_principal` keys.",
+        )
+    },
+    examples=[
+        OpenApiExample(
+            "Administration",
+            value={
+                "principal": {
+                    "id": 1,
+                    "office": "principal",
+                    "office_display": "Principal",
+                    "full_name": "Md. Abdul Karim",
+                    "designation": "Principal",
+                    "qualification": "M.A., B.Ed.",
+                    "experience_years": 22,
+                    "message": "Welcome to The Holy Child Pre-Cadet & High School…",
+                    "biography": "",
+                    "photo_url": None,
+                },
+                "vice_principal": None,
+            },
+            response_only=True,
+        )
+    ],
+)
+class PublicAdministrationAPIView(APIView):
+    """The sitting principal and vice principal, for anonymous visitors."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        records = {
+            record.office: PrincipalPublicSerializer(record, context={"request": request}).data
+            for record in Principal.objects.filter(is_deleted=False, is_active=True, is_current=True)
+        }
+        return Response(
+            {
+                "principal": records.get(Principal.Office.PRINCIPAL),
+                "vice_principal": records.get(Principal.Office.VICE_PRINCIPAL),
+            }
+        )
 
 
 @crud_schema(

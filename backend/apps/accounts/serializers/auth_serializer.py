@@ -1,14 +1,16 @@
+from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.constants import DEFAULT_SELF_REGISTRATION_ROLE
 from apps.accounts.models import Role, User
 from apps.accounts.serializers.user_serializer import UserCompactSerializer
+from apps.accounts.utils import validate_phone_value
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -50,11 +52,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone(self, value: str) -> str:
-        value = value.strip()
-        digits = value.lstrip("+").replace(" ", "").replace("-", "")
-        if not digits.isdigit() or not (6 <= len(digits) <= 15):
-            raise serializers.ValidationError("Enter a valid phone number (6–15 digits, optional leading '+').")
-        return value
+        return validate_phone_value(value, required=True)
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirmation"]:
@@ -76,31 +74,80 @@ class RegisterSerializer(serializers.ModelSerializer):
         return User.objects.create_user(password=password, role=default_role, **validated_data)
 
 
-class LoginSerializer(TokenObtainPairSerializer):
+#: Request keys that mean "the thing the user typed into the identity box".
+IDENTIFIER_ALIASES = ("identifier", "email", "phone", "username")
+
+
+def token_pair_for(user) -> dict:
+    """A refresh/access pair carrying the claims the frontend reads on boot."""
+    refresh = RefreshToken.for_user(user)
+    refresh["email"] = user.email
+    refresh["full_name"] = user.full_name
+    refresh["role"] = user.role.slug if user.role_id and user.role else None
+    return {"refresh": str(refresh), "access": str(refresh.access_token)}
+
+
+class LoginSerializer(serializers.Serializer):
     """
     Exchanges credentials for a JWT pair plus the caller's identity and
     permission codes, so the frontend can render its navigation immediately.
+
+    One ``identifier`` field takes an email address, a phone number or a
+    username; :class:`~apps.accounts.backends.EmailPhoneOrUsernameBackend`
+    decides which it is. ``email``, ``phone`` and ``username`` are accepted as
+    aliases for the same field so older clients keep working unchanged.
+
+    This is written against ``authenticate()`` rather than SimpleJWT's
+    ``TokenObtainPairSerializer`` because that class types its identity field
+    from ``USERNAME_FIELD`` — an ``EmailField``, which rejects a phone number
+    before any backend ever sees it.
     """
 
-    default_error_messages = {
-        "no_active_account": "No active account was found with the given credentials."
-    }
+    identifier = serializers.CharField(
+        help_text="Email address, phone number or username.",
+        required=False,
+        allow_blank=True,
+    )
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
 
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
-        token["email"] = user.email
-        token["full_name"] = user.full_name
-        token["role"] = user.role.slug if user.role_id and user.role else None
-        return token
+    def to_internal_value(self, data):
+        # Fold whichever alias the client sent into `identifier`. `copy()` keeps
+        # a QueryDict a QueryDict — `dict(QueryDict)` would turn every value
+        # into a list.
+        if hasattr(data, "get") and not data.get("identifier"):
+            data = data.copy()
+            for alias in IDENTIFIER_ALIASES[1:]:
+                if data.get(alias):
+                    data["identifier"] = data[alias]
+                    break
+        return super().to_internal_value(data)
+
+    def validate_identifier(self, value: str) -> str:
+        return (value or "").strip()
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        identifier = attrs.get("identifier", "")
+        if not identifier:
+            raise serializers.ValidationError(
+                {"identifier": "Enter your email address or phone number."}
+            )
+
         request = self.context.get("request")
+        user = authenticate(request=request, username=identifier, password=attrs["password"])
+        if user is None:
+            # One message for every failure: a distinct "no such account" reply
+            # would turn the login form into an account-existence oracle.
+            raise AuthenticationFailed(
+                "No active account was found with the given credentials.", code="no_active_account"
+            )
+
         if request is not None:
-            self.user.record_login(ip_address=_client_ip(request))
-        data["user"] = UserCompactSerializer(self.user, context=self.context).data
-        return data
+            user.record_login(ip_address=_client_ip(request))
+
+        return {
+            **token_pair_for(user),
+            "user": UserCompactSerializer(user, context=self.context).data,
+        }
 
 
 class LoginResponseSerializer(serializers.Serializer):

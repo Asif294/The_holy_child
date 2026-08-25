@@ -168,3 +168,80 @@ class AuthenticationTests(APITestCase):
         self.client.force_authenticate(user=None)
         retry = self.client.post(reverse("v1:auth-token-refresh"), {"refresh": refresh}, format="json")
         self.assertEqual(retry.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class LoginIdentifierTests(APITestCase):
+    """The login form takes one box; it must accept everything that names an account."""
+
+    @classmethod
+    def setUpTestData(cls):
+        sync_permissions()
+        sync_roles(DEFAULT_ROLES)
+        cls.password = "StrongPass!2026"
+        cls.user = User.objects.create_user(
+            email="nasrin@holychildschool.edu.bd",
+            password=cls.password,
+            full_name="Nasrin Akter",
+            phone="+880 1700-111222",
+            username="nasrin",
+        )
+
+    def login(self, payload):
+        return self.client.post(reverse("v1:auth-login"), payload, format="json")
+
+    def test_phone_is_stored_without_spaces_or_dashes(self):
+        self.assertEqual(self.user.phone, "+8801700111222")
+
+    def test_login_with_the_email_address(self):
+        response = self.login({"identifier": self.user.email, "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+
+    def test_login_with_the_phone_number(self):
+        response = self.login({"identifier": "+8801700111222", "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"]["email"], self.user.email)
+
+    def test_login_with_a_differently_formatted_phone_number(self):
+        """Digits are what matter — punctuation is not a credential."""
+        response = self.login({"identifier": "+880 1700 111 222", "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_login_with_the_username(self):
+        response = self.login({"identifier": "nasrin", "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_the_email_key_still_works_as_an_alias(self):
+        response = self.login({"email": self.user.email, "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_an_unknown_identifier_is_rejected(self):
+        response = self.login({"identifier": "01999999999", "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_a_missing_identifier_is_a_validation_error(self):
+        response = self.login({"password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def test_a_second_account_cannot_claim_the_same_phone_number(self):
+        response = self.client.post(
+            reverse("v1:auth-register"),
+            {
+                "full_name": "Copycat User",
+                "email": "copycat@example.com",
+                "password": "StrongPass!2026",
+                "password_confirmation": "StrongPass!2026",
+                "phone": "+880 1700-111222",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("phone", response.data["errors"])
+
+    def test_a_deactivated_account_cannot_sign_in(self):
+        self.user.is_active = False
+        self.user.save(update_fields=["is_active"])
+        response = self.login({"identifier": self.user.email, "password": self.password})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.user.is_active = True
+        self.user.save(update_fields=["is_active"])

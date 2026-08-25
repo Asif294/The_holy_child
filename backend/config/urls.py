@@ -20,6 +20,7 @@ api_v1_patterns = [
     path("", include("apps.attendance.urls")),
     path("", include("apps.fees.urls")),
     path("", include("apps.exams.urls")),
+    path("", include("apps.website.urls")),
 ]
 
 urlpatterns = [

@@ -7,6 +7,8 @@ import {
   CreditCard,
   FileBarChart,
   GraduationCap,
+  Images,
+  Info,
   KeyRound,
   LayoutDashboard,
   Layers,
@@ -15,6 +17,7 @@ import {
   Settings,
   ShieldCheck,
   Stamp,
+  Trophy,
   UserCog,
   Users,
   Wallet,
@@ -48,10 +51,20 @@ export const NAVIGATION = [
     ],
   },
   {
+    id: 'website',
+    title: 'Public Website',
+    items: [
+      { label: 'Hero slider', to: '/app/hero-slides', icon: Images, permission: P.content.view },
+      { label: 'About the school', to: '/app/about', icon: Info, permission: P.content.view },
+      { label: 'Achievements', to: '/app/achievements', icon: Award, permission: P.content.view },
+      { label: 'Successful students', to: '/app/successful-students', icon: Trophy, permission: P.achiever.view },
+    ],
+  },
+  {
     id: 'principal',
     title: "Principal's Office",
     items: [
-      { label: 'Principal', to: '/app/principal', icon: BadgeCheck, permission: P.principal.view },
+      { label: 'Administration', to: '/app/principal', icon: BadgeCheck, permission: P.principal.view },
       { label: 'Notices', to: '/app/notices', icon: Megaphone, permission: P.notice.view },
       { label: 'Approvals', to: '/app/approvals', icon: Stamp, anyOf: [P.principal.view, P.principal.approve] },
     ],

@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from apps.accounts.constants import ROLE_SUPER_ADMIN
 from apps.accounts.models.role_model import Role
+from apps.accounts.utils import clean_phone
 from apps.common.models import BaseModel
 
 
@@ -66,8 +67,10 @@ class User(AbstractBaseUser, BaseModel):
     Custom user for the whole platform.
 
     Authentication is email-first (``USERNAME_FIELD = "email"``) but the login
-    endpoint also accepts the username — see
-    :class:`apps.accounts.backends.EmailOrUsernameBackend`.
+    endpoint also accepts the phone number or the username — see
+    :class:`apps.accounts.backends.EmailPhoneOrUsernameBackend`. That is why
+    ``phone`` is unique whenever it is filled in: a number that identified two
+    accounts could not identify either.
 
     A user holds exactly one :class:`~apps.accounts.models.role_model.Role`, and
     every capability check resolves through that role's permission codes.
@@ -81,7 +84,13 @@ class User(AbstractBaseUser, BaseModel):
     email = models.EmailField(max_length=254, unique=True, db_index=True, verbose_name="Email address")
     username = models.CharField(max_length=150, unique=True, db_index=True)
     full_name = models.CharField(max_length=150)
-    phone = models.CharField(max_length=20, blank=True, default="", db_index=True)
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Stored without spaces or dashes. Doubles as a login identifier.",
+    )
     profile_image = models.ImageField(upload_to=profile_image_path, null=True, blank=True)
     gender = models.CharField(max_length=10, choices=Gender.choices, blank=True, default="")
     date_of_birth = models.DateField(null=True, blank=True)
@@ -110,6 +119,16 @@ class User(AbstractBaseUser, BaseModel):
         ordering = ["-created_at"]
         verbose_name = "User"
         verbose_name_plural = "Users"
+        constraints = [
+            # Blank is the "no number on file" case and stays freely repeatable;
+            # a real number must point at exactly one account so it can be used
+            # to sign in.
+            models.UniqueConstraint(
+                fields=["phone"],
+                condition=~models.Q(phone=""),
+                name="unique_user_phone",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.full_name} <{self.email}>"
@@ -122,6 +141,7 @@ class User(AbstractBaseUser, BaseModel):
             self.email = self.email.strip().lower()
         if self.username:
             self.username = self.username.strip()
+        self.phone = clean_phone(self.phone)
         super().save(*args, **kwargs)
 
     # ----------------------------------------------------------------- #

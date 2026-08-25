@@ -4,6 +4,7 @@ from .auth_serializer import (
     LogoutSerializer,
     RegisterResponseSerializer,
     RegisterSerializer,
+    token_pair_for,
 )
 from .permission_serializer import PermissionGroupSerializer, PermissionSerializer
 from .role_serializer import RoleListSerializer, RoleSerializer
@@ -34,4 +35,5 @@ __all__ = [
     "UserRoleBriefSerializer",
     "UserSerializer",
     "UserWriteSerializer",
+    "token_pair_for",
 ]

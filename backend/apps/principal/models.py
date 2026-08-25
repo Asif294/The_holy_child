@@ -5,12 +5,29 @@ from apps.common.models import BaseModel
 
 class Principal(BaseModel):
     """
-    The head of the institution.
+    A member of the school's administration — the principal or a vice principal.
 
     Kept as its own record — rather than a flag on ``Teacher`` — because the
     principal's office owns notices and approvals, carries a public-facing
     message on the landing page, and has a tenure history worth preserving.
+
+    ``office`` distinguishes the two seats. One record per office is
+    ``is_current`` at a time, so the public *Administration* section can show
+    the sitting principal beside the sitting vice principal without either
+    standing the other down.
     """
+
+    class Office(models.TextChoices):
+        PRINCIPAL = "principal", "Principal"
+        VICE_PRINCIPAL = "vice_principal", "Vice Principal"
+
+    office = models.CharField(
+        max_length=20,
+        choices=Office.choices,
+        default=Office.PRINCIPAL,
+        db_index=True,
+        help_text="Which seat this record holds.",
+    )
 
     user = models.OneToOneField(
         "accounts.User",
@@ -30,7 +47,9 @@ class Principal(BaseModel):
     )
 
     full_name = models.CharField(max_length=150)
-    designation = models.CharField(max_length=100, default="Principal")
+    designation = models.CharField(
+        max_length=100, blank=True, default="", help_text='Free text, e.g. "Principal" or "Vice Principal".'
+    )
     email = models.EmailField(blank=True, default="")
     phone = models.CharField(max_length=20, blank=True, default="")
     photo = models.ImageField(upload_to="principal/", null=True, blank=True)
@@ -49,8 +68,9 @@ class Principal(BaseModel):
 
     class Meta:
         db_table = "principals"
-        ordering = ["-is_current", "-tenure_start"]
-        verbose_name = "Principal"
+        ordering = ["office", "-is_current", "-tenure_start"]
+        verbose_name = "Administrator"
+        verbose_name_plural = "Administration"
 
     def __str__(self):
         return f"{self.full_name} — {self.designation}"
@@ -58,11 +78,14 @@ class Principal(BaseModel):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         if self.is_current:
-            Principal.objects.exclude(pk=self.pk).filter(is_current=True).update(is_current=False)
+            # Only the holder of the *same* office stands down.
+            Principal.objects.exclude(pk=self.pk).filter(
+                office=self.office, is_current=True
+            ).update(is_current=False)
 
     @classmethod
-    def current(cls):
-        return cls.active_objects.filter(is_current=True).first()
+    def current(cls, office: str = Office.PRINCIPAL):
+        return cls.active_objects.filter(office=office, is_current=True).first()
 
 
 class Notice(BaseModel):

@@ -13,7 +13,6 @@ import PublicOnlyRoute from './PublicOnlyRoute'
 // almost nothing in common, so there is no reason to ship both to every visitor.
 const Landing = lazy(() => import('@/pages/Landing'))
 const Login = lazy(() => import('@/pages/auth/Login'))
-const Register = lazy(() => import('@/pages/auth/Register'))
 const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard'))
 const Students = lazy(() => import('@/pages/academics/Students'))
 const Teachers = lazy(() => import('@/pages/academics/Teachers'))
@@ -33,6 +32,10 @@ const Users = lazy(() => import('@/pages/system/Users'))
 const Roles = lazy(() => import('@/pages/system/Roles'))
 const Permissions = lazy(() => import('@/pages/system/Permissions'))
 const Settings = lazy(() => import('@/pages/system/Settings'))
+const HeroSlides = lazy(() => import('@/pages/website/HeroSlides'))
+const AboutPage = lazy(() => import('@/pages/website/AboutPage'))
+const Achievements = lazy(() => import('@/pages/website/Achievements'))
+const SuccessfulStudentsAdmin = lazy(() => import('@/pages/website/SuccessfulStudentsAdmin'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Forbidden = lazy(() => import('@/pages/Forbidden'))
 const NotFound = lazy(() => import('@/pages/NotFound'))
@@ -50,6 +53,10 @@ function Fallback() {
  * and `PermissionRoute` for the specific code the screen needs. Neither is a
  * security boundary — Django re-checks the same code on every request — but
  * together they keep users off screens that would only show them a 403.
+ *
+ * `/` is deliberately outside both. The school's website — hero, about,
+ * teachers, administration and results — is public, and signing in adds the
+ * management surface rather than unlocking the site.
  */
 export function AppRoutes() {
   return (
@@ -58,13 +65,13 @@ export function AppRoutes() {
         {/* Public */}
         <Route path="/" element={<Landing />} />
 
-        {/* Auth */}
+        {/* Auth — sign-in only; accounts are issued by an administrator. */}
         <Route element={<PublicOnlyRoute />}>
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
           </Route>
         </Route>
+        <Route path="/register" element={<Navigate to="/login" replace />} />
 
         {/* Application shell */}
         <Route element={<ProtectedRoute />}>
@@ -79,6 +86,15 @@ export function AppRoutes() {
             <Route path="attendance" element={<PermissionRoute permission={P.attendance.view}><Attendance /></PermissionRoute>} />
             <Route path="exams" element={<PermissionRoute permission={P.exam.view}><Exams /></PermissionRoute>} />
             <Route path="results" element={<PermissionRoute permission={P.result.view}><Results /></PermissionRoute>} />
+
+            {/* Public website */}
+            <Route path="hero-slides" element={<PermissionRoute permission={P.content.view}><HeroSlides /></PermissionRoute>} />
+            <Route path="about" element={<PermissionRoute permission={P.content.view}><AboutPage /></PermissionRoute>} />
+            <Route path="achievements" element={<PermissionRoute permission={P.content.view}><Achievements /></PermissionRoute>} />
+            <Route
+              path="successful-students"
+              element={<PermissionRoute permission={P.achiever.view}><SuccessfulStudentsAdmin /></PermissionRoute>}
+            />
 
             {/* Principal's office */}
             <Route path="principal" element={<PermissionRoute permission={P.principal.view}><PrincipalOffice /></PermissionRoute>} />

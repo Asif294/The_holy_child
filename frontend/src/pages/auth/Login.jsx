@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Lock, UserRound } from 'lucide-react'
 
 import Alert from '@/components/ui/Alert'
 import Button from '@/components/ui/Button'
@@ -9,6 +9,14 @@ import useAuth from '@/hooks/useAuth'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import useToast from '@/hooks/useToast'
 
+/**
+ * The only way into the system.
+ *
+ * There is no self-registration: accounts are created by an administrator, who
+ * also decides the role each one carries. Signing in lands on the school's own
+ * home page — the dashboard is one click further, behind whichever permissions
+ * the account holds.
+ */
 export function Login() {
   useDocumentTitle('Sign in')
 
@@ -17,7 +25,7 @@ export function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ identifier: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState(null)
@@ -34,7 +42,7 @@ export function Login() {
     dismissSessionExpiry()
 
     const nextErrors = {}
-    if (!form.email.trim()) nextErrors.email = 'Enter your email address.'
+    if (!form.identifier.trim()) nextErrors.identifier = 'Enter your email address or phone number.'
     if (!form.password) nextErrors.password = 'Enter your password.'
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors)
@@ -43,9 +51,10 @@ export function Login() {
 
     setSubmitting(true)
     try {
-      const user = await login({ email: form.email.trim(), password: form.password })
+      const user = await login({ identifier: form.identifier.trim(), password: form.password })
       toast.success(`Welcome back, ${user.full_name ?? user.name}.`)
-      navigate(location.state?.from?.pathname ?? '/app', { replace: true })
+      // Back to wherever they were headed, or to the school's home page.
+      navigate(location.state?.from?.pathname ?? '/', { replace: true })
     } catch (error) {
       setErrors(error.errors ?? {})
       setFormError(error.message)
@@ -54,10 +63,17 @@ export function Login() {
     }
   }
 
+  function errorFor(field) {
+    const value = errors[field]
+    return Array.isArray(value) ? value[0] : value
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h1>
-      <p className="mt-1.5 text-sm text-slate-500">Sign in to your SmartSchool account to continue.</p>
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sign in</h1>
+      <p className="mt-1.5 text-sm text-slate-500">
+        For staff and students of the school. Use the email address or mobile number the office has on file.
+      </p>
 
       {sessionExpired ? (
         <Alert type="warning" className="mt-5">
@@ -73,15 +89,15 @@ export function Login() {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
         <Input
-          label="Email address"
-          type="email"
-          name="email"
-          autoComplete="email"
-          placeholder="you@holychildschool.edu.bd"
-          leftIcon={<Mail className="h-4 w-4" />}
-          value={form.email}
-          onChange={(event) => update('email', event.target.value)}
-          error={Array.isArray(errors.email) ? errors.email[0] : errors.email}
+          label="Email address or phone number"
+          type="text"
+          name="identifier"
+          autoComplete="username"
+          placeholder="you@holychildschool.edu.bd or 01700000000"
+          leftIcon={<UserRound className="h-4 w-4" />}
+          value={form.identifier}
+          onChange={(event) => update('identifier', event.target.value)}
+          error={errorFor('identifier')}
           required
         />
 
@@ -94,7 +110,7 @@ export function Login() {
           leftIcon={<Lock className="h-4 w-4" />}
           value={form.password}
           onChange={(event) => update('password', event.target.value)}
-          error={Array.isArray(errors.password) ? errors.password[0] : errors.password}
+          error={errorFor('password')}
           required
           rightSlot={
             <button
@@ -113,10 +129,20 @@ export function Login() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500">
-        Don&rsquo;t have an account?{' '}
-        <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700">
-          Create one
+      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+        <p className="text-sm text-slate-600">
+          Accounts are issued by the school office — there is no public sign-up. If you have lost your
+          password, ask an administrator to reset it; you can change it yourself from your profile once
+          you are signed in.
+        </p>
+      </div>
+
+      <p className="mt-6 text-center text-sm">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 font-medium text-slate-500 transition-colors hover:text-brand-600"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to the school website
         </Link>
       </p>
     </div>

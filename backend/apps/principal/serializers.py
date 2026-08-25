@@ -7,19 +7,24 @@ from apps.principal.models import ApprovalRequest, Notice, Principal
 class PrincipalSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     signature_url = serializers.SerializerMethodField()
+    office_display = serializers.CharField(source="get_office_display", read_only=True)
     user_email = serializers.CharField(source="user.email", read_only=True, default=None)
     teacher_employee_id = serializers.CharField(source="teacher.employee_id", read_only=True, default=None)
 
     class Meta:
         model = Principal
         fields = (
-            "id", "user", "user_email", "teacher", "teacher_employee_id", "full_name", "designation",
-            "email", "phone", "photo", "photo_url", "signature", "signature_url", "qualification",
-            "experience_years", "message", "biography", "tenure_start", "tenure_end", "is_current",
-            "is_active", "created_at", "updated_at",
+            "id", "office", "office_display", "user", "user_email", "teacher", "teacher_employee_id",
+            "full_name", "designation", "email", "phone", "photo", "photo_url", "signature",
+            "signature_url", "qualification", "experience_years", "message", "biography",
+            "tenure_start", "tenure_end", "is_current", "is_active", "created_at", "updated_at",
         )
-        read_only_fields = ("id", "user_email", "teacher_employee_id", "photo_url", "signature_url",
-                            "created_at", "updated_at")
+        read_only_fields = ("id", "office_display", "user_email", "teacher_employee_id", "photo_url",
+                            "signature_url", "created_at", "updated_at")
+        extra_kwargs = {
+            "photo": {"write_only": True, "required": False, "allow_null": True},
+            "signature": {"write_only": True, "required": False, "allow_null": True},
+        }
 
     def _absolute(self, field) -> str | None:
         if not field:
@@ -40,15 +45,27 @@ class PrincipalSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"tenure_end": "Tenure end cannot fall before tenure start."})
         return attrs
 
+    def create(self, validated_data):
+        # An administrator who leaves the designation blank gets the office name,
+        # which is what every one of them would have typed anyway.
+        if not validated_data.get("designation"):
+            office = validated_data.get("office", Principal.Office.PRINCIPAL)
+            validated_data["designation"] = Principal.Office(office).label
+        return super().create(validated_data)
+
 
 class PrincipalPublicSerializer(serializers.ModelSerializer):
-    """The subset of the principal's record that is safe to show publicly."""
+    """The subset of an administrator's record that is safe to show publicly."""
 
     photo_url = serializers.SerializerMethodField()
+    office_display = serializers.CharField(source="get_office_display", read_only=True)
 
     class Meta:
         model = Principal
-        fields = ("full_name", "designation", "qualification", "experience_years", "message", "photo_url")
+        fields = (
+            "id", "office", "office_display", "full_name", "designation", "qualification",
+            "experience_years", "message", "biography", "photo_url",
+        )
         read_only_fields = fields
 
     def get_photo_url(self, obj) -> str | None:

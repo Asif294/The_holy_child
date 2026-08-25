@@ -33,6 +33,16 @@ PERMISSION_MODULES: dict[str, dict] = {
     "result": {"label": "Results", "group": GROUP_ACADEMICS, "actions": CRUD + (("publish", "Publish"),)},
     "admission": {"label": "Admissions", "group": GROUP_ADMINISTRATION, "actions": CRUD},
     "notice": {"label": "Notices", "group": GROUP_ADMINISTRATION, "actions": CRUD},
+    "content": {
+        "label": "Website Content",
+        "group": GROUP_ADMINISTRATION,
+        "actions": CRUD,
+    },
+    "achiever": {
+        "label": "Successful Students",
+        "group": GROUP_ADMINISTRATION,
+        "actions": CRUD,
+    },
     "principal": {
         "label": "Principal Office",
         "group": GROUP_ADMINISTRATION,
@@ -132,6 +142,7 @@ DEFAULT_ROLES: list[dict] = [
         "permissions": codes_for(
             "student", "teacher", "class", "subject", "attendance", "exam", "result",
             "admission", "notice", "fee", "payment", "report", "dashboard", "user", "principal",
+            "content", "achiever",
         ) + ["setting.view", "role.view", "permission.view"],
     },
     {
@@ -139,7 +150,7 @@ DEFAULT_ROLES: list[dict] = [
         "slug": ROLE_PRINCIPAL,
         "description": "Head of institution: full academic oversight, approvals and notices.",
         "is_system": False,
-        "permissions": codes_for("principal", "notice", "report", "dashboard")
+        "permissions": codes_for("principal", "notice", "report", "dashboard", "content", "achiever")
         + [
             "student.view", "student.create", "student.update",
             "teacher.view", "teacher.create", "teacher.update",
@@ -163,6 +174,7 @@ DEFAULT_ROLES: list[dict] = [
             "exam.view",
             "result.view", "result.create", "result.update",
             "notice.view",
+            "content.view", "achiever.view",
         ],
     },
     {
