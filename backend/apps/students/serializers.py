@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
+from apps.common.identifiers import create_with_generated_codes
 from apps.students.models import Guardian, Student
+from apps.students.services import next_admission_number, next_student_id
 
 
 class GuardianSerializer(serializers.ModelSerializer):
@@ -62,12 +64,25 @@ class StudentSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "class_name", "section_name", "session_name", "guardian_detail",
                             "status_display", "photo_url", "created_at", "updated_at")
+        # Left blank, both codes are issued by the server — see `create` below.
+        extra_kwargs = {
+            "student_id": {"required": False, "allow_blank": True},
+            "admission_number": {"required": False, "allow_blank": True},
+        }
 
     def get_photo_url(self, obj) -> str | None:
         if not obj.photo:
             return None
         request = self.context.get("request")
         return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url
+
+    def create(self, validated_data):
+        """Fills in whichever code was left blank, and survives losing a race for it."""
+        return create_with_generated_codes(
+            super().create,
+            validated_data,
+            {"student_id": next_student_id, "admission_number": next_admission_number},
+        )
 
     def validate_student_id(self, value: str) -> str:
         return self._validate_unique("student_id", value, "A student with this ID already exists.")
@@ -76,7 +91,11 @@ class StudentSerializer(serializers.ModelSerializer):
         return self._validate_unique("admission_number", value, "This admission number is already in use.")
 
     def _validate_unique(self, field: str, value: str, message: str) -> str:
-        value = value.strip().upper()
+        value = (value or "").strip().upper()
+        if not value:
+            # On a create this asks for the next code; on an edit it means the
+            # field was simply left alone, so the stored code stands.
+            return getattr(self.instance, field, "") if self.instance else ""
         queryset = Student.objects.filter(**{f"{field}__iexact": value})
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)

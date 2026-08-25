@@ -51,6 +51,16 @@ export const studentService = {
     const { data } = await api.get('/students/statistics/', { params })
     return data
   },
+  /**
+   * `{ student_id, admission_number }` for the next admission.
+   *
+   * A suggestion, not a reservation — the form pre-fills it so the clerk can
+   * see what will be issued, and the server re-checks it on save.
+   */
+  async nextIdentifiers() {
+    const { data } = await api.get('/students/next-identifiers/')
+    return data
+  },
 }
 
 export const guardianService = createCrudService('guardians')
@@ -63,6 +73,11 @@ export const teacherService = {
   },
   async myProfile() {
     const { data } = await api.get('/teachers/me/')
+    return data
+  },
+  /** `{ employee_id }` for the next member of staff — pre-filled, still editable. */
+  async nextEmployeeId() {
+    const { data } = await api.get('/teachers/next-employee-id/')
     return data
   },
 }

@@ -58,7 +58,7 @@ const COLUMNS = [
 ]
 
 const FIELDS = [
-  { name: 'full_name', label: 'Student name', required: true, placeholder: 'Ayesha Siddika' },
+  { name: 'full_name', label: 'Student name', required: true },
   { name: 'academic_year', label: 'Academic year', required: true, placeholder: '2025' },
   { name: 'student_class', label: 'Class', placeholder: 'Class 10' },
   { name: 'section', label: 'Section', placeholder: 'A' },

@@ -41,7 +41,7 @@ export function Users() {
 
   const fields = useMemo(
     () => [
-      { name: 'full_name', label: 'Full name', required: true, placeholder: 'Nasrin Akter' },
+      { name: 'full_name', label: 'Full name', required: true },
       { name: 'email', label: 'Email address', type: 'email', required: true, placeholder: 'name@holychildschool.edu.bd' },
       { name: 'username', label: 'Username', hint: 'Derived from the email when left blank.' },
       { name: 'phone', label: 'Phone', type: 'tel', placeholder: '+8801700000000' },

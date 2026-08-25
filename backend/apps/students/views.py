@@ -7,6 +7,7 @@ from apps.common.schema import PROTECTED_RESPONSES, crud_schema
 from apps.common.viewsets import RBACModelViewSet
 from apps.students.models import Guardian, Student
 from apps.students.serializers import GuardianSerializer, StudentListSerializer, StudentSerializer
+from apps.students.services import next_enrolment_identifiers
 
 
 @crud_schema(tag="Students", resource="guardian", serializer=GuardianSerializer)
@@ -41,7 +42,7 @@ class StudentViewSet(RBACModelViewSet):
     """The student register."""
 
     permission_module = "student"
-    permission_map = {"statistics": "student.view"}
+    permission_map = {"statistics": "student.view", "next_identifiers": "student.create"}
     serializer_class = StudentSerializer
     search_fields = ["full_name", "student_id", "admission_number", "father_name", "mother_name"]
     ordering_fields = ["full_name", "roll_number", "admission_date", "created_at"]
@@ -55,6 +56,25 @@ class StudentViewSet(RBACModelViewSet):
 
     def get_serializer_class(self):
         return StudentListSerializer if self.action == "list" else StudentSerializer
+
+    @extend_schema(
+        tags=["Students"],
+        summary="Next enrolment identifiers",
+        description=(
+            "The student ID and admission number the next admission will be given, so the "
+            "form can show them before anything is saved. Both are suggestions rather than "
+            "reservations: send different values and those are stored instead, and if two "
+            "clerks are handed the same number, whichever record is saved second is issued "
+            "the following one. Requires the `student.create` permission."
+        ),
+        responses={
+            200: OpenApiResponse(description="`{student_id, admission_number}`."),
+            **PROTECTED_RESPONSES,
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="next-identifiers")
+    def next_identifiers(self, request):
+        return Response(next_enrolment_identifiers())
 
     @extend_schema(
         tags=["Students"],

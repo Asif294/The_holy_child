@@ -1,7 +1,9 @@
 from rest_framework import serializers
 
+from apps.common.identifiers import create_with_generated_codes
 from apps.common.serializers import MultipartModelSerializer
 from apps.teachers.models import Department, Designation, Teacher
+from apps.teachers.services import next_employee_id
 
 
 class DesignationSerializer(serializers.ModelSerializer):
@@ -74,6 +76,8 @@ class TeacherSerializer(MultipartModelSerializer):
         )
         read_only_fields = ("id", "user_email", "designation_name", "department_name", "status_display",
                             "photo_url", "subject_names", "sections_led", "created_at", "updated_at")
+        # Left blank, the employee ID is issued by the server — see `create` below.
+        extra_kwargs = {"employee_id": {"required": False, "allow_blank": True}}
 
     def get_photo_url(self, obj) -> str | None:
         if not obj.photo:
@@ -87,8 +91,18 @@ class TeacherSerializer(MultipartModelSerializer):
     def get_sections_led(self, obj) -> list[str]:
         return [str(section) for section in obj.class_teacher_of.filter(is_deleted=False)]
 
+    def create(self, validated_data):
+        """Fills in the employee ID when left blank, and survives losing a race for it."""
+        return create_with_generated_codes(
+            super().create, validated_data, {"employee_id": next_employee_id}
+        )
+
     def validate_employee_id(self, value: str) -> str:
-        value = value.strip().upper()
+        value = (value or "").strip().upper()
+        if not value:
+            # On a create this asks for the next ID; on an edit it means the
+            # field was simply left alone, so the stored ID stands.
+            return getattr(self.instance, "employee_id", "") if self.instance else ""
         queryset = Teacher.objects.filter(employee_id__iexact=value)
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)

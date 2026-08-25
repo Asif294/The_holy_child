@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ImageUp, X } from 'lucide-react'
 
 import Input, { Select, Textarea } from '@/components/ui/Input'
@@ -188,14 +188,27 @@ export function ImageField({ label, hint, required, error, file, existingUrl, on
   )
 }
 
-/** Seeds form state from a record (or the field defaults when creating). */
+/**
+ * Seeds form state from a record (or the field defaults when creating).
+ *
+ * The seed is re-run when `record` changes — a different row to edit, or a
+ * fresh `{}` for a new one — and at no other time.
+ */
 export function useResourceForm(fields, record) {
   const [values, setValues] = useState({})
   const [errors, setErrors] = useState({})
 
+  // The field list is read while seeding but is deliberately *not* a
+  // dependency of the effect below. Screens rebuild it on every render, and
+  // some rebuild it in response to the form itself — picking a class narrows
+  // the section options, which produces a new field list. Re-seeding on that
+  // would blank every answer the moment a class was chosen.
+  const fieldsRef = useRef(fields)
+  fieldsRef.current = fields
+
   useEffect(() => {
     const next = {}
-    for (const field of fields) {
+    for (const field of fieldsRef.current) {
       if (field.type === 'image') {
         // An image field holds a newly picked File, never the stored URL:
         // "nothing chosen" has to mean "leave the stored file alone".
@@ -207,7 +220,7 @@ export function useResourceForm(fields, record) {
     }
     setValues(next)
     setErrors({})
-  }, [fields, record])
+  }, [record])
 
   function change(name, value) {
     setValues((current) => ({ ...current, [name]: value }))

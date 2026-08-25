@@ -16,6 +16,7 @@ from apps.teachers.serializers import (
     TeacherPublicSerializer,
     TeacherSerializer,
 )
+from apps.teachers.services import next_employee_id as generate_employee_id
 
 
 @crud_schema(tag="Teachers", resource="designation", serializer=DesignationSerializer)
@@ -71,7 +72,11 @@ class TeacherViewSet(RBACModelViewSet):
     """
 
     permission_module = "teacher"
-    permission_map = {"statistics": "teacher.view", "my_profile": "teacher.view"}
+    permission_map = {
+        "statistics": "teacher.view",
+        "my_profile": "teacher.view",
+        "next_employee_id": "teacher.create",
+    }
     serializer_class = TeacherSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     search_fields = ["full_name", "employee_id", "email", "phone", "specialization"]
@@ -88,6 +93,22 @@ class TeacherViewSet(RBACModelViewSet):
 
     def get_serializer_class(self):
         return TeacherListSerializer if self.action == "list" else TeacherSerializer
+
+    @extend_schema(
+        tags=["Teachers"],
+        summary="Next employee ID",
+        description=(
+            "The employee ID the next member of staff will be given, so the form can show "
+            "it before anything is saved. It is a suggestion rather than a reservation: "
+            "send a different value and that is stored instead, and if two clerks are "
+            "handed the same number, whichever record is saved second is issued the "
+            "following one. Requires the `teacher.create` permission."
+        ),
+        responses={200: OpenApiResponse(description="`{employee_id}`."), **PROTECTED_RESPONSES},
+    )
+    @action(detail=False, methods=["get"], url_path="next-employee-id")
+    def next_employee_id(self, request):
+        return Response({"employee_id": generate_employee_id()})
 
     @extend_schema(
         tags=["Teachers"],

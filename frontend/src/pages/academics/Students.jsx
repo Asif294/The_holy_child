@@ -68,10 +68,20 @@ export function Students() {
 
   const fields = useMemo(
     () => [
-      { name: 'full_name', label: 'Full name', required: true, placeholder: 'Tanvir Ahmed' },
-      { name: 'full_name_bn', label: 'Bangla name', placeholder: 'তানভীর আহমেদ' },
-      { name: 'student_id', label: 'Student ID', required: true, placeholder: 'THC-2026-0001' },
-      { name: 'admission_number', label: 'Admission number', required: true, placeholder: 'ADM-2026-0001' },
+      { name: 'full_name', label: 'Full name', required: true },
+      { name: 'full_name_bn', label: 'Bangla name' },
+      {
+        name: 'student_id',
+        label: 'Student ID',
+        required: true,
+        hint: 'Issued automatically. Change it if this student already has an ID.',
+      },
+      {
+        name: 'admission_number',
+        label: 'Admission number',
+        required: true,
+        hint: 'Issued automatically, and editable.',
+      },
       { name: 'school_class', label: 'Class', type: 'select', options: classOptions },
       { name: 'section', label: 'Section', type: 'select', options: sectionOptions },
       { name: 'roll_number', label: 'Roll number', type: 'number', min: 1 },
@@ -92,8 +102,11 @@ export function Students() {
     [classOptions, sectionOptions, sessionOptions, guardianOptions],
   )
 
-  const formRecord = useMemo(() => (editing?.id ? editing : null), [editing])
-  const form = useResourceForm(fields, formRecord)
+  // `editing` doubles as the form seed: the record when editing, and a fresh
+  // `{}` when admitting. Handing over that new object — rather than a shared
+  // `null` — re-seeds the form every time it opens, so cancelling a half-filled
+  // admission and starting again begins from a blank form.
+  const form = useResourceForm(fields, editing)
 
   const handleChange = useCallback(
     (name, value) => {
@@ -106,9 +119,21 @@ export function Students() {
     [form],
   )
 
-  function openCreate() {
+  /**
+   * Opens a blank admission form, then fills in the student ID and admission
+   * number the server will issue next. The modal opens straight away: the two
+   * numbers arriving a moment later, or not at all, just leave fields to type
+   * into, and the server re-checks whatever is finally submitted.
+   */
+  async function openCreate() {
     setSelectedClass('')
     setEditing({})
+    try {
+      const identifiers = await studentService.nextIdentifiers()
+      form.setValues((current) => ({ ...current, ...identifiers }))
+    } catch {
+      // Not worth a toast — both fields are editable, so a clerk can type them.
+    }
   }
 
   async function openEdit(row) {

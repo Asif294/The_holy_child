@@ -26,7 +26,7 @@ const OFFICES = [
 ]
 
 const FIELDS = [
-  { name: 'full_name', label: 'Full name', required: true, placeholder: 'Md. Abdul Karim' },
+  { name: 'full_name', label: 'Full name', required: true },
   { name: 'designation', label: 'Designation', placeholder: 'Principal' },
   { name: 'email', label: 'Email', type: 'email' },
   { name: 'phone', label: 'Phone', type: 'tel' },

@@ -34,6 +34,7 @@ export function CrudPage({
   emptyDescription,
   toPayload = (values) => values,
   toFormValues = (record) => record,
+  createDefaults,
   extraActions,
   rowActions,
 }) {
@@ -47,8 +48,12 @@ export function CrudPage({
   const [isSaving, setSaving] = useState(false)
   const [isDeleting, setDeleting_] = useState(false)
 
+  // `editing` doubles as the form seed: the row when editing, and a fresh `{}`
+  // when creating. Handing over that new object — rather than a shared `null` —
+  // re-seeds the form every time it opens, so cancelling a half-filled create
+  // and starting again begins from the defaults instead of the old answers.
   const formRecord = useMemo(
-    () => (editing && editing.id ? toFormValues(editing) : null),
+    () => (editing && editing.id ? toFormValues(editing) : editing),
     [editing, toFormValues],
   )
   const form = useResourceForm(fields, formRecord)
@@ -57,6 +62,22 @@ export function CrudPage({
   const hasFileField = useMemo(() => fields.some((field) => field.type === 'image'), [fields])
 
   const closeForm = useCallback(() => setEditing(null), [])
+
+  /**
+   * Opens a blank form, then fills in whatever the server wants to suggest —
+   * a generated employee ID, say. The modal opens immediately either way: the
+   * suggestion arriving late, or not at all, just leaves a field to type into.
+   */
+  async function openCreate() {
+    setEditing({})
+    if (!createDefaults) return
+    try {
+      const defaults = await createDefaults()
+      if (defaults) form.setValues((current) => ({ ...current, ...defaults }))
+    } catch {
+      // Not worth a toast — the field is editable, so the clerk can type one.
+    }
+  }
 
   /** JSON by default; multipart once the form can carry a file. */
   function bodyFor(payload) {
@@ -148,7 +169,7 @@ export function CrudPage({
           <>
             {extraActions}
             <Can permission={`${module}.create`}>
-              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setEditing({})}>
+              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
                 Add {singular}
               </Button>
             </Can>

@@ -76,26 +76,36 @@ export function Teachers() {
     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={row.status_display} /> },
   ]
 
-  const fields = [
-    { name: 'full_name', label: 'Full name', required: true, placeholder: 'Nasrin Akter' },
-    { name: 'employee_id', label: 'Employee ID', required: true, placeholder: 'THC-T-0001' },
-    { name: 'email', label: 'Email', type: 'email', placeholder: 'teacher@holychildschool.edu.bd' },
-    { name: 'phone', label: 'Phone', type: 'tel', placeholder: '+8801700000000' },
-    { name: 'designation', label: 'Designation', type: 'select', options: designationOptions },
-    { name: 'department', label: 'Department', type: 'select', options: departmentOptions },
-    { name: 'employment_type', label: 'Employment type', type: 'select', options: EMPLOYMENT_OPTIONS, defaultValue: 'full_time' },
-    { name: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS, defaultValue: 'active' },
-    { name: 'joining_date', label: 'Joining date', type: 'date' },
-    { name: 'resignation_date', label: 'Resignation date', type: 'date' },
-    { name: 'qualification', label: 'Qualification', placeholder: 'M.Sc. in Mathematics' },
-    { name: 'specialization', label: 'Specialisation', placeholder: 'Algebra' },
-    { name: 'experience_years', label: 'Years of experience', type: 'number', min: 0, defaultValue: 0 },
-    { name: 'gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
-    { name: 'date_of_birth', label: 'Date of birth', type: 'date' },
-    { name: 'blood_group', label: 'Blood group', placeholder: 'O+' },
-    { name: 'national_id', label: 'National ID' },
-    { name: 'address', label: 'Address', type: 'textarea' },
-  ]
+  // Memoised so the option lists are the only thing that rebuilds the field
+  // list, matching how every other screen here declares its form.
+  const fields = useMemo(
+    () => [
+      { name: 'full_name', label: 'Full name', required: true },
+      {
+        name: 'employee_id',
+        label: 'Employee ID',
+        required: true,
+        hint: 'Issued automatically. Change it if this teacher already has an ID.',
+      },
+      { name: 'email', label: 'Email', type: 'email', placeholder: 'teacher@holychildschool.edu.bd' },
+      { name: 'phone', label: 'Phone', type: 'tel', placeholder: '+8801700000000' },
+      { name: 'designation', label: 'Designation', type: 'select', options: designationOptions },
+      { name: 'department', label: 'Department', type: 'select', options: departmentOptions },
+      { name: 'employment_type', label: 'Employment type', type: 'select', options: EMPLOYMENT_OPTIONS, defaultValue: 'full_time' },
+      { name: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS, defaultValue: 'active' },
+      { name: 'joining_date', label: 'Joining date', type: 'date' },
+      { name: 'resignation_date', label: 'Resignation date', type: 'date' },
+      { name: 'qualification', label: 'Qualification', placeholder: 'M.Sc. in Mathematics' },
+      { name: 'specialization', label: 'Specialisation', placeholder: 'Algebra' },
+      { name: 'experience_years', label: 'Years of experience', type: 'number', min: 0, defaultValue: 0 },
+      { name: 'gender', label: 'Gender', type: 'select', options: GENDER_OPTIONS },
+      { name: 'date_of_birth', label: 'Date of birth', type: 'date' },
+      { name: 'blood_group', label: 'Blood group', placeholder: 'O+' },
+      { name: 'national_id', label: 'National ID' },
+      { name: 'address', label: 'Address', type: 'textarea' },
+    ],
+    [designationOptions, departmentOptions],
+  )
 
   return (
     <CrudPage
@@ -106,6 +116,7 @@ export function Teachers() {
       singular="teacher"
       columns={columns}
       fields={fields}
+      createDefaults={teacherService.nextEmployeeId}
       searchPlaceholder="Search name, employee ID or phone…"
       filters={[
         { name: 'department', placeholder: 'All departments', options: departmentOptions },
