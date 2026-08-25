@@ -145,3 +145,78 @@ class EmployeeIdentifierTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["employee_id"], "THC-T-0500")
+
+
+class EmployeeIdAvailabilityTests(APITestCase):
+    """The live "is this ID free?" check behind the staff form."""
+
+    @classmethod
+    def setUpTestData(cls):
+        sync_permissions()
+        sync_roles(DEFAULT_ROLES)
+        cls.admin = User.objects.create_superuser(
+            email="head@example.com", full_name="Head Teacher", password="StrongPass!2026"
+        )
+        cls.teacher = Teacher.objects.create(full_name="On staff", employee_id="THC-T-0001")
+
+    def setUp(self):
+        self.url = reverse("v1:teacher-check-employee-id")
+        self.client.force_authenticate(self.admin)
+
+    def test_a_free_id_reports_nothing(self):
+        response = self.client.get(self.url, {"employee_id": "THC-T-0777"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+
+    def test_a_taken_id_reports_the_clash(self):
+        response = self.client.get(self.url, {"employee_id": "THC-T-0001"})
+
+        self.assertEqual(response.data, {"employee_id": "A teacher with this employee ID already exists."})
+
+    def test_the_check_ignores_case(self):
+        response = self.client.get(self.url, {"employee_id": "thc-t-0001"})
+
+        self.assertIn("employee_id", response.data)
+
+    def test_a_teachers_own_id_is_not_a_clash_when_editing(self):
+        response = self.client.get(self.url, {"employee_id": "THC-T-0001", "exclude": self.teacher.id})
+
+        self.assertEqual(response.data, {})
+
+    def test_a_resigned_teacher_still_holds_their_id(self):
+        self.teacher.soft_delete()
+
+        response = self.client.get(self.url, {"employee_id": "THC-T-0001"})
+
+        self.assertIn("employee_id", response.data)
+
+    def test_an_empty_value_is_not_a_clash(self):
+        response = self.client.get(self.url, {"employee_id": ""})
+
+        self.assertEqual(response.data, {})
+
+    def test_the_message_matches_what_the_save_would_say(self):
+        """What the form says while typing must be what it says on save."""
+        checked = self.client.get(self.url, {"employee_id": "thc-t-0001"}).data
+        saved = self.client.post(
+            reverse("v1:teacher-list"), {"full_name": "Clash", "employee_id": "thc-t-0001"}, format="json"
+        )
+
+        self.assertEqual(checked["employee_id"], saved.data["errors"]["employee_id"][0])
+
+    def test_the_same_message_regardless_of_how_it_was_typed(self):
+        """An exact match and a differently-cased one are the same rejection."""
+        exact = self.client.post(
+            reverse("v1:teacher-list"), {"full_name": "A", "employee_id": "THC-T-0001"}, format="json"
+        )
+        cased = self.client.post(
+            reverse("v1:teacher-list"), {"full_name": "B", "employee_id": "thc-t-0001"}, format="json"
+        )
+
+        self.assertEqual(exact.data["errors"]["employee_id"], cased.data["errors"]["employee_id"])
+
+    def test_the_check_is_closed_to_anonymous_callers(self):
+        self.client.force_authenticate(None)
+
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_401_UNAUTHORIZED)

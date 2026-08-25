@@ -61,6 +61,21 @@ export const studentService = {
     const { data } = await api.get('/students/next-identifiers/')
     return data
   },
+  /**
+   * Which of the given codes are already taken, as `{ field: message }`.
+   *
+   * Empty when both are free. Pass `exclude` with a student's id when editing
+   * so their own code does not read as a clash.
+   */
+  async checkIdentifiers(params) {
+    const { data } = await api.get('/students/check-identifiers/', { params })
+    return data
+  },
+  /** `{ roll_number }` — the next free roll within a section. */
+  async nextRoll(section) {
+    const { data } = await api.get('/students/next-roll/', { params: { section } })
+    return data
+  },
 }
 
 export const guardianService = createCrudService('guardians')
@@ -78,6 +93,11 @@ export const teacherService = {
   /** `{ employee_id }` for the next member of staff — pre-filled, still editable. */
   async nextEmployeeId() {
     const { data } = await api.get('/teachers/next-employee-id/')
+    return data
+  },
+  /** `{ employee_id: message }` when the ID is taken, `{}` when it is free. */
+  async checkEmployeeId(params) {
+    const { data } = await api.get('/teachers/check-employee-id/', { params })
     return data
   },
 }

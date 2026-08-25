@@ -11,6 +11,7 @@ import ResourceForm, { useResourceForm } from '@/components/common/ResourceForm'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import usePaginatedList from '@/hooks/usePaginatedList'
 import useToast from '@/hooks/useToast'
+import useUniqueCheck from '@/hooks/useUniqueCheck'
 
 /**
  * A complete list-plus-modal CRUD screen driven by declarations.
@@ -35,6 +36,7 @@ export function CrudPage({
   toPayload = (values) => values,
   toFormValues = (record) => record,
   createDefaults,
+  checkUnique,
   extraActions,
   rowActions,
 }) {
@@ -60,6 +62,23 @@ export function CrudPage({
 
   // A form with a file in it has to go out as multipart; one without stays JSON.
   const hasFileField = useMemo(() => fields.some((field) => field.type === 'image'), [fields])
+
+  // Fields declared `unique: true` are checked against the register as they are
+  // typed, so a code that is already taken is called out there rather than at
+  // the save. `checkUnique` is the service call that answers for this resource.
+  const uniqueFields = useMemo(
+    () => fields.filter((field) => field.unique).map((field) => field.name),
+    [fields],
+  )
+  const check = useUniqueCheck(checkUnique, form.setErrors)
+
+  const handleChange = useCallback(
+    (name, value) => {
+      form.change(name, value)
+      if (uniqueFields.includes(name)) check(name, value, { exclude: editing?.id })
+    },
+    [form, uniqueFields, check, editing],
+  )
 
   const closeForm = useCallback(() => setEditing(null), [])
 
@@ -237,7 +256,7 @@ export function CrudPage({
             fields={fields}
             values={form.values}
             errors={form.errors}
-            onChange={form.change}
+            onChange={handleChange}
             record={editing}
           />
         </form>

@@ -14,6 +14,7 @@ import useApi from '@/hooks/useApi'
 import useDocumentTitle from '@/hooks/useDocumentTitle'
 import usePaginatedList from '@/hooks/usePaginatedList'
 import useToast from '@/hooks/useToast'
+import useUniqueCheck from '@/hooks/useUniqueCheck'
 import { classService, guardianService, sectionService, sessionService, studentService } from '@/services'
 import { formatDate } from '@/utils/formatters'
 
@@ -70,18 +71,8 @@ export function Students() {
     () => [
       { name: 'full_name', label: 'Full name', required: true },
       { name: 'full_name_bn', label: 'Bangla name' },
-      {
-        name: 'student_id',
-        label: 'Student ID',
-        required: true,
-        hint: 'Issued automatically. Change it if this student already has an ID.',
-      },
-      {
-        name: 'admission_number',
-        label: 'Admission number',
-        required: true,
-        hint: 'Issued automatically, and editable.',
-      },
+      { name: 'student_id', label: 'Student ID', required: true },
+      { name: 'admission_number', label: 'Admission number', required: true },
       { name: 'school_class', label: 'Class', type: 'select', options: classOptions },
       { name: 'section', label: 'Section', type: 'select', options: sectionOptions },
       { name: 'roll_number', label: 'Roll number', type: 'number', min: 1 },
@@ -108,16 +99,42 @@ export function Students() {
   // admission and starting again begins from a blank form.
   const form = useResourceForm(fields, editing)
 
+  // Both codes are pre-filled with a free number, but they can be typed over —
+  // for a pupil transferring in with an ID already. This says so as it is typed
+  // rather than leaving it to the save.
+  const checkIdentifier = useUniqueCheck(studentService.checkIdentifiers, form.setErrors)
+
   const handleChange = useCallback(
     (name, value) => {
       form.change(name, value)
+
+      if (name === 'student_id' || name === 'admission_number') {
+        checkIdentifier(name, value, { exclude: editing?.id })
+      }
+
       if (name === 'school_class') {
         setSelectedClass(value)
         form.change('section', '')
       }
+
+      // A roll only means anything within a section, so picking one is what
+      // decides the number — and picking a different one makes the old number
+      // wrong, not just stale.
+      if (name === 'section') fillNextRoll(value)
     },
-    [form],
+    [form, checkIdentifier, editing],
   )
+
+  /** Puts the next free roll in that section into the roll field. */
+  async function fillNextRoll(sectionId) {
+    if (!sectionId) return
+    try {
+      const { roll_number: roll } = await studentService.nextRoll(sectionId)
+      form.setValues((current) => ({ ...current, roll_number: roll ?? '' }))
+    } catch {
+      // Not worth a toast — the field is editable, and the save checks the roll.
+    }
+  }
 
   /**
    * Opens a blank admission form, then fills in the student ID and admission

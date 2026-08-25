@@ -16,7 +16,7 @@ from apps.teachers.serializers import (
     TeacherPublicSerializer,
     TeacherSerializer,
 )
-from apps.teachers.services import next_employee_id as generate_employee_id
+from apps.teachers.services import employee_id_clash, next_employee_id as generate_employee_id
 
 
 @crud_schema(tag="Teachers", resource="designation", serializer=DesignationSerializer)
@@ -76,6 +76,7 @@ class TeacherViewSet(RBACModelViewSet):
         "statistics": "teacher.view",
         "my_profile": "teacher.view",
         "next_employee_id": "teacher.create",
+        "check_employee_id": "teacher.view",
     }
     serializer_class = TeacherSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -109,6 +110,32 @@ class TeacherViewSet(RBACModelViewSet):
     @action(detail=False, methods=["get"], url_path="next-employee-id")
     def next_employee_id(self, request):
         return Response({"employee_id": generate_employee_id()})
+
+    @extend_schema(
+        tags=["Teachers"],
+        summary="Is this employee ID free?",
+        description=(
+            "Answers whether an employee ID is already on the register, so the staff form "
+            "can say so while it is being typed rather than after it is submitted. Pass "
+            "`exclude` with a teacher's id when editing, so their own ID does not read as a "
+            "clash.\n\nReturns `{}` when the ID is free, or `{employee_id: message}` when "
+            "it is taken. This is a courtesy check, not a reservation: the save itself is "
+            "what enforces uniqueness. Requires the `teacher.view` permission."
+        ),
+        parameters=[
+            OpenApiParameter("employee_id", str, description="The employee ID to test."),
+            OpenApiParameter("exclude", int, description="A teacher id to ignore — their own ID."),
+        ],
+        responses={200: OpenApiResponse(description="`{}` when free, else `{employee_id: message}`."), **PROTECTED_RESPONSES},
+    )
+    @action(detail=False, methods=["get"], url_path="check-employee-id")
+    def check_employee_id(self, request):
+        exclude = request.query_params.get("exclude")
+        clash = employee_id_clash(
+            request.query_params.get("employee_id"),
+            exclude=int(exclude) if (exclude or "").isdigit() else None,
+        )
+        return Response({"employee_id": clash} if clash else {})
 
     @extend_schema(
         tags=["Teachers"],

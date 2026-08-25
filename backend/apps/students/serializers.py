@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.common.identifiers import create_with_generated_codes
 from apps.students.models import Guardian, Student
-from apps.students.services import next_admission_number, next_student_id
+from apps.students.services import IDENTIFIER_MESSAGES, next_admission_number, next_student_id
 
 
 class GuardianSerializer(serializers.ModelSerializer):
@@ -65,9 +65,17 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "class_name", "section_name", "session_name", "guardian_detail",
                             "status_display", "photo_url", "created_at", "updated_at")
         # Left blank, both codes are issued by the server — see `create` below.
+        #
+        # `validators: []` drops the `UniqueValidator` DRF derives from
+        # `unique=True`. It compares exactly, so `thc-2026-0001` would slip past
+        # it and be caught a step later by `_validate_unique` instead — the same
+        # rejection worded two different ways depending on how the clerk typed
+        # it. `_validate_unique` is case-insensitive and covers both, and the
+        # database constraint is still there behind it. (Only the uniqueness
+        # validator is dropped; `max_length` is applied by the field itself.)
         extra_kwargs = {
-            "student_id": {"required": False, "allow_blank": True},
-            "admission_number": {"required": False, "allow_blank": True},
+            "student_id": {"required": False, "allow_blank": True, "validators": []},
+            "admission_number": {"required": False, "allow_blank": True, "validators": []},
         }
 
     def get_photo_url(self, obj) -> str | None:
@@ -85,12 +93,12 @@ class StudentSerializer(serializers.ModelSerializer):
         )
 
     def validate_student_id(self, value: str) -> str:
-        return self._validate_unique("student_id", value, "A student with this ID already exists.")
+        return self._validate_unique("student_id", value)
 
     def validate_admission_number(self, value: str) -> str:
-        return self._validate_unique("admission_number", value, "This admission number is already in use.")
+        return self._validate_unique("admission_number", value)
 
-    def _validate_unique(self, field: str, value: str, message: str) -> str:
+    def _validate_unique(self, field: str, value: str) -> str:
         value = (value or "").strip().upper()
         if not value:
             # On a create this asks for the next code; on an edit it means the
@@ -100,7 +108,7 @@ class StudentSerializer(serializers.ModelSerializer):
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
-            raise serializers.ValidationError(message)
+            raise serializers.ValidationError(IDENTIFIER_MESSAGES[field])
         return value
 
     def validate(self, attrs):

@@ -81,12 +81,7 @@ export function Teachers() {
   const fields = useMemo(
     () => [
       { name: 'full_name', label: 'Full name', required: true },
-      {
-        name: 'employee_id',
-        label: 'Employee ID',
-        required: true,
-        hint: 'Issued automatically. Change it if this teacher already has an ID.',
-      },
+      { name: 'employee_id', label: 'Employee ID', required: true, unique: true },
       { name: 'email', label: 'Email', type: 'email', placeholder: 'teacher@holychildschool.edu.bd' },
       { name: 'phone', label: 'Phone', type: 'tel', placeholder: '+8801700000000' },
       { name: 'designation', label: 'Designation', type: 'select', options: designationOptions },
@@ -117,6 +112,7 @@ export function Teachers() {
       columns={columns}
       fields={fields}
       createDefaults={teacherService.nextEmployeeId}
+      checkUnique={teacherService.checkEmployeeId}
       searchPlaceholder="Search name, employee ID or phone…"
       filters={[
         { name: 'department', placeholder: 'All departments', options: departmentOptions },

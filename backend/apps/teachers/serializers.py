@@ -3,7 +3,7 @@ from rest_framework import serializers
 from apps.common.identifiers import create_with_generated_codes
 from apps.common.serializers import MultipartModelSerializer
 from apps.teachers.models import Department, Designation, Teacher
-from apps.teachers.services import next_employee_id
+from apps.teachers.services import EMPLOYEE_ID_MESSAGE, next_employee_id
 
 
 class DesignationSerializer(serializers.ModelSerializer):
@@ -77,7 +77,10 @@ class TeacherSerializer(MultipartModelSerializer):
         read_only_fields = ("id", "user_email", "designation_name", "department_name", "status_display",
                             "photo_url", "subject_names", "sections_led", "created_at", "updated_at")
         # Left blank, the employee ID is issued by the server — see `create` below.
-        extra_kwargs = {"employee_id": {"required": False, "allow_blank": True}}
+        # `validators: []` drops the exact-match `UniqueValidator` DRF derives
+        # from `unique=True`, leaving the case-insensitive `validate_employee_id`
+        # below as the single check — see the note in `StudentSerializer` for why.
+        extra_kwargs = {"employee_id": {"required": False, "allow_blank": True, "validators": []}}
 
     def get_photo_url(self, obj) -> str | None:
         if not obj.photo:
@@ -107,7 +110,7 @@ class TeacherSerializer(MultipartModelSerializer):
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
-            raise serializers.ValidationError("A teacher with this employee ID already exists.")
+            raise serializers.ValidationError(EMPLOYEE_ID_MESSAGE)
         return value
 
     def validate(self, attrs):

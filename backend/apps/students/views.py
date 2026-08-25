@@ -3,11 +3,12 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_sche
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.common.responses import error_response
 from apps.common.schema import PROTECTED_RESPONSES, crud_schema
 from apps.common.viewsets import RBACModelViewSet
 from apps.students.models import Guardian, Student
 from apps.students.serializers import GuardianSerializer, StudentListSerializer, StudentSerializer
-from apps.students.services import next_enrolment_identifiers
+from apps.students.services import identifier_clashes, next_enrolment_identifiers, next_roll_number
 
 
 @crud_schema(tag="Students", resource="guardian", serializer=GuardianSerializer)
@@ -42,7 +43,12 @@ class StudentViewSet(RBACModelViewSet):
     """The student register."""
 
     permission_module = "student"
-    permission_map = {"statistics": "student.view", "next_identifiers": "student.create"}
+    permission_map = {
+        "statistics": "student.view",
+        "next_identifiers": "student.create",
+        "check_identifiers": "student.view",
+        "next_roll": "student.view",
+    }
     serializer_class = StudentSerializer
     search_fields = ["full_name", "student_id", "admission_number", "father_name", "mother_name"]
     ordering_fields = ["full_name", "roll_number", "admission_date", "created_at"]
@@ -75,6 +81,54 @@ class StudentViewSet(RBACModelViewSet):
     @action(detail=False, methods=["get"], url_path="next-identifiers")
     def next_identifiers(self, request):
         return Response(next_enrolment_identifiers())
+
+    @extend_schema(
+        tags=["Students"],
+        summary="Are these enrolment codes free?",
+        description=(
+            "Answers whether a student ID or admission number is already taken, so the "
+            "admission form can say so while it is being typed rather than after it is "
+            "submitted. Pass either or both codes; pass `exclude` with a student's id when "
+            "editing, so their own code does not read as a clash.\n\n"
+            "Returns only the codes that clash, as `{field: message}` — an empty object "
+            "means both are free. This is a courtesy check, not a reservation: the save "
+            "itself is what enforces uniqueness. Requires the `student.view` permission."
+        ),
+        parameters=[
+            OpenApiParameter("student_id", str, description="The student ID to test."),
+            OpenApiParameter("admission_number", str, description="The admission number to test."),
+            OpenApiParameter("exclude", int, description="A student id to ignore — their own code."),
+        ],
+        responses={200: OpenApiResponse(description="`{}` when free, else `{field: message}`."), **PROTECTED_RESPONSES},
+    )
+    @action(detail=False, methods=["get"], url_path="check-identifiers")
+    def check_identifiers(self, request):
+        exclude = request.query_params.get("exclude")
+        return Response(
+            identifier_clashes(
+                request.query_params,
+                exclude=int(exclude) if (exclude or "").isdigit() else None,
+            )
+        )
+
+    @extend_schema(
+        tags=["Students"],
+        summary="Next free roll number in a section",
+        description=(
+            "The roll after the highest one in use in a section, so the admission form can "
+            "fill it in once a class and section are chosen. Rolls are unique within a "
+            "section, not school-wide, so a section is required. A pupil who has left frees "
+            "their roll. Requires the `student.view` permission."
+        ),
+        parameters=[OpenApiParameter("section", int, description="The section to number within.", required=True)],
+        responses={200: OpenApiResponse(description="`{roll_number}`."), **PROTECTED_RESPONSES},
+    )
+    @action(detail=False, methods=["get"], url_path="next-roll")
+    def next_roll(self, request):
+        section = request.query_params.get("section") or ""
+        if not section.isdigit():
+            return error_response("A section is required to work out the next roll number.")
+        return Response({"roll_number": next_roll_number(int(section))})
 
     @extend_schema(
         tags=["Students"],
