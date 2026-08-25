@@ -1,0 +1,40 @@
+# ---- Secrets (never commit) ----
+.env
+.env.local
+.env.*.local
+*/.env
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+env/
+
+# ---- Django ----
+*.sqlite3
+db.sqlite3
+backend/media/
+backend/staticfiles/
+backend/logs/
+*.log
+
+# ---- Node ----
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-error.log*
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- Generated ----
+schema.yml
+coverage/
+.coverage
+htmlcov/
