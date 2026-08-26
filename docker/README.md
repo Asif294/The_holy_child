@@ -180,13 +180,21 @@ docker compose exec nginx nginx -t      # check the nginx config without restart
 | The site | http://localhost:8080 | `https://$DOMAIN` |
 | API docs | http://localhost:8080/api/docs/ | `https://$DOMAIN/api/docs/` |
 | Django admin | http://localhost:8080/admin/ | `https://$DOMAIN/admin/` |
+| Vite on its own | http://localhost:5173 | — |
+| Django on its own | http://localhost:8000 | not published |
 | PostgreSQL | localhost:5434 | not published |
 | Uploads | `holy-child-dev_media-files` volume | `holy-child-prod_media-files` volume |
 
-Only two host ports are published in development, and both are set in `.env`:
-`NGINX_HOST_PORT` (8080) and `DB_HOST_PORT` (5434). Inside the compose network
-the services always talk on 80 and 5432, so changing either is a one-line edit
-that nothing else depends on.
+**http://localhost:8080 is the one that matches production** — one origin, nginx
+routing `/api/`, `/admin/`, `/static/` and `/media/`. The other two are there for
+debugging a single half of the stack; on :5173 it is Vite's own proxy that
+forwards the API calls, not nginx.
+
+Every published host port is set in `.env` — `NGINX_HOST_PORT`,
+`FRONTEND_HOST_PORT`, `BACKEND_HOST_PORT`, `DB_HOST_PORT`. Inside the compose
+network the services always talk on 80, 5173, 8000 and 5432, so moving one out
+of the way of something else is a one-line edit. Production publishes nothing
+but nginx.
 
 ---
 

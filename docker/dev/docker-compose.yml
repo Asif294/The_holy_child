@@ -45,6 +45,9 @@ services:
         condition: service_healthy
     networks:
       - holy_child_dev_network
+    ports:
+      # Django reached directly, bypassing nginx — handy for /admin/ and /api/docs/
+      - "${BACKEND_HOST_PORT:-8000}:8000"
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
@@ -72,6 +75,9 @@ services:
       - backend
     networks:
       - holy_child_dev_network
+    ports:
+      # The Vite dev server reached directly, bypassing nginx
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
     command: >
       sh -c "if [ ! -f node_modules/.bin/vite ]; then
                echo 'Vite binary not found, running npm install...'

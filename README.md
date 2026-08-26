@@ -95,9 +95,11 @@ docker compose up -d --build
 `/static/` and `/media/` from the shared volumes, forwards `/api/` and
 `/admin/` to Django, and passes everything else to the Vite dev server with the
 websocket upgrade that hot reloading needs. Both application containers run
-against a bind mount, so an edit on the host reloads in the container. The two
-published host ports — nginx on **8080** and Postgres on **5434** — are set in
-`docker/dev/.env`, so they can move out of the way of anything already running.
+against a bind mount, so an edit on the host reloads in the container. Vite
+(**:5173**), Django (**:8000**) and Postgres (**:5434**) are also published for
+debugging a single half of the stack, but :8080 is the one that matches
+production. Every host port is set in `docker/dev/.env`, so any of them can move
+out of the way of something already running.
 
 **Production** is the same shape with the pieces swapped: gunicorn instead of
 `runserver`, and the built React app served by its own nginx instead of Vite.
