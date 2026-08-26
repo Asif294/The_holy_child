@@ -5,7 +5,7 @@ Dockerfiles, nginx config, environment — lives in its own folder:
 
 ```
 docker/
-├── dev/     PostgreSQL · Django (runserver) · Vite dev server · nginx      → http://localhost
+├── dev/     PostgreSQL · Django (runserver) · Vite dev server · nginx      → http://localhost:8080
 └── prod/    PostgreSQL · Django (gunicorn)  · built React app  · nginx     → https://$DOMAIN
 ```
 
@@ -27,7 +27,7 @@ cd docker/dev     # …or docker/prod
 
 ```bash
 cp .env.example .env      # fill in SECRET_KEY, DATABASE_PASSWORD, DJANGO_ADMIN_PASSWORD
-docker compose up --build
+docker compose up --build     # http://localhost:8080
 ```
 
 The backend container migrates, collects static files and seeds permissions,
@@ -153,7 +153,7 @@ docker compose exec -T db pg_dump -U holy_user the_holy > backup.sql
 docker compose exec -T db psql -U holy_user the_holy < backup.sql
 ```
 
-In development the database is also on **localhost:5433**, so pgAdmin, DBeaver
+In development the database is also on **localhost:5434**, so pgAdmin, DBeaver
 or a host-side `psql` can reach it. Production does not publish the port at all
 — the backend container is the only thing that can connect.
 
@@ -177,11 +177,16 @@ docker compose exec nginx nginx -t      # check the nginx config without restart
 
 | | Development | Production |
 | --- | --- | --- |
-| The site | http://localhost | `https://$DOMAIN` |
-| API docs | http://localhost/api/docs/ | `https://$DOMAIN/api/docs/` |
-| Django admin | http://localhost/admin/ | `https://$DOMAIN/admin/` |
-| PostgreSQL | localhost:5433 | not published |
+| The site | http://localhost:8080 | `https://$DOMAIN` |
+| API docs | http://localhost:8080/api/docs/ | `https://$DOMAIN/api/docs/` |
+| Django admin | http://localhost:8080/admin/ | `https://$DOMAIN/admin/` |
+| PostgreSQL | localhost:5434 | not published |
 | Uploads | `holy-child-dev_media-files` volume | `holy-child-prod_media-files` volume |
+
+Only two host ports are published in development, and both are set in `.env`:
+`NGINX_HOST_PORT` (8080) and `DB_HOST_PORT` (5434). Inside the compose network
+the services always talk on 80 and 5432, so changing either is a one-line edit
+that nothing else depends on.
 
 ---
 
@@ -207,8 +212,9 @@ starts, so it is set in one place only.
 
 | Symptom | Usually |
 | --- | --- |
-| `port is already allocated` | Another stack owns port 80 or 5433. Stop it, or change the mapping in `docker-compose.yml`. |
+| `ports are not available … address already in use` | Something else owns that host port — another stack's proxy, or a locally installed PostgreSQL. Change `NGINX_HOST_PORT` or `DB_HOST_PORT` in `.env` and `docker compose up -d`. Find the culprit with `ss -ltn`. |
 | `error getting credentials … gpg` | The Docker credential helper cannot decrypt its store. Remove the `credsStore` line from `~/.docker/config.json`, or repair `pass`. |
+| `service "backend" is not running` | `up` never finished. A service it depends on failed to start — check `docker compose ps -a`: containers stuck in `Created` mean the run was aborted, usually by the port clash above. |
 | Backend restarts in a loop | Read `docker compose logs backend`. Usually a missing `SECRET_KEY`, or `ALLOWED_HOSTS` without the host you are using. |
 | `502 Bad Gateway` from nginx | The backend is not up yet, or it crashed on start. Check its logs. |
 | Hot reload stopped working | `docker compose restart frontend`. If it persists, remove the `node_modules` volume: `docker compose down && docker compose up --build`. |

@@ -22,8 +22,9 @@ services:
     networks:
       - holy_child_dev_network
     ports:
-      # 5433 on the host so an already-installed PostgreSQL keeps 5432
-      - "5433:5432"
+      # Host port only — inside the network it is always 5432. Pick a free one:
+      # 5432 and 5433 are usually taken by a locally installed PostgreSQL.
+      - "${DB_HOST_PORT:-5434}:5432"
 
   # Django Backend
   backend:
@@ -84,7 +85,8 @@ services:
     container_name: holy-child-dev-nginx
     restart: always
     ports:
-      - "80:80"
+      # 80 is often already taken by another stack's proxy.
+      - "${NGINX_HOST_PORT:-8080}:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - static-files:/var/www/static:ro

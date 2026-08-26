@@ -83,7 +83,7 @@ docker/
 # Development — Django autoreloads, Vite hot-reloads, both behind nginx
 cd docker/dev
 cp .env.example .env          # fill in SECRET_KEY, the database and admin passwords
-docker compose up --build     # http://localhost
+docker compose up --build     # http://localhost:8080
 
 # Production
 cd docker/prod
@@ -91,12 +91,13 @@ cp .env.example .env          # then set DOMAIN and your real hostnames
 docker compose up -d --build
 ```
 
-**Development** puts the whole site on **http://localhost** — nginx serves
+**Development** puts the whole site on **http://localhost:8080** — nginx serves
 `/static/` and `/media/` from the shared volumes, forwards `/api/` and
 `/admin/` to Django, and passes everything else to the Vite dev server with the
 websocket upgrade that hot reloading needs. Both application containers run
-against a bind mount, so an edit on the host reloads in the container. Postgres
-is published on **5433**, leaving 5432 to any PostgreSQL already installed.
+against a bind mount, so an edit on the host reloads in the container. The two
+published host ports — nginx on **8080** and Postgres on **5434** — are set in
+`docker/dev/.env`, so they can move out of the way of anything already running.
 
 **Production** is the same shape with the pieces swapped: gunicorn instead of
 `runserver`, and the built React app served by its own nginx instead of Vite.
@@ -121,7 +122,7 @@ docker compose exec db psql -U holy_user the_holy  # a psql prompt
 ```
 
 > Running Django on the host against the containerised database instead? Point
-> `backend/.env` at it — `DATABASE_HOST=localhost` and `DATABASE_PORT=5433`,
+> `backend/.env` at it — `DATABASE_HOST=localhost` and `DATABASE_PORT=5434`,
 > with the engine, name, user and password from `docker/dev/.env`.
 
 Everything else — resetting a stack, running the tests, dumping the database,
