@@ -57,9 +57,13 @@ class DepartmentViewSet(RBACModelViewSet):
             "Requires the `teacher.view` permission."
         ),
         "create": (
-            "Adds a member of teaching staff to the register. The `user` link is optional — "
-            "a teacher can be recorded before being granted system access. "
-            "Requires the `teacher.create` permission."
+            "Adds a member of teaching staff to the register, and issues the login account "
+            "that goes with the record: their email signs in, their phone number is the "
+            "first password, and the account carries the *Teacher* role. A teacher with no "
+            "email or no phone number on file has nothing to sign in with and is recorded "
+            "without an account; an email that already has an account keeps that account "
+            "rather than getting a second one. Send `user` to link a specific account and "
+            "none is created. Requires the `teacher.create` permission."
         ),
     },
 )

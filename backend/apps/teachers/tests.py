@@ -220,3 +220,147 @@ class EmployeeIdAvailabilityTests(APITestCase):
         self.client.force_authenticate(None)
 
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class StaffAccountTests(APITestCase):
+    """The login account issued alongside a new teacher."""
+
+    @classmethod
+    def setUpTestData(cls):
+        sync_permissions()
+        sync_roles(DEFAULT_ROLES)
+        cls.admin = User.objects.create_superuser(
+            email="head@example.com", full_name="Head Teacher", password="StrongPass!2026"
+        )
+
+    def setUp(self):
+        self.list_url = reverse("v1:teacher-list")
+        self.client.force_authenticate(self.admin)
+
+    def payload(self, **overrides):
+        return {
+            "full_name": "Asif Ahmed",
+            "email": "asif@holychildschool.edu.bd",
+            "phone": "+8801700000000",
+            "gender": "male",
+            "date_of_birth": "1990-04-11",
+            "address": "12 School Road, Dhaka",
+            **overrides,
+        }
+
+    def test_adding_a_teacher_issues_the_account_that_goes_with_the_record(self):
+        response = self.client.post(self.list_url, self.payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        teacher = Teacher.objects.get(id=response.data["id"])
+        self.assertIsNotNone(teacher.user)
+        self.assertEqual(teacher.user.email, "asif@holychildschool.edu.bd")
+        self.assertEqual(response.data["user_email"], "asif@holychildschool.edu.bd")
+
+    def test_the_account_carries_the_details_the_form_collected(self):
+        response = self.client.post(self.list_url, self.payload(), format="json")
+
+        user = Teacher.objects.get(id=response.data["id"]).user
+        self.assertEqual(user.full_name, "Asif Ahmed")
+        self.assertEqual(user.phone, "+8801700000000")
+        self.assertEqual(user.gender, "male")
+        self.assertEqual(str(user.date_of_birth), "1990-04-11")
+        self.assertEqual(user.address, "12 School Road, Dhaka")
+
+    def test_the_phone_number_is_the_first_password(self):
+        response = self.client.post(self.list_url, self.payload(), format="json")
+
+        user = Teacher.objects.get(id=response.data["id"]).user
+        self.assertTrue(user.check_password("+8801700000000"))
+
+    def test_the_account_signs_in_as_a_teacher(self):
+        response = self.client.post(self.list_url, self.payload(), format="json")
+
+        user = Teacher.objects.get(id=response.data["id"]).user
+        self.assertEqual(user.role.slug, "teacher")
+        self.assertIn("attendance.create", user.get_permission_codes())
+        self.assertNotIn("teacher.create", user.get_permission_codes())
+
+    def test_a_teacher_with_no_email_is_recorded_without_an_account(self):
+        response = self.client.post(self.list_url, self.payload(email=""), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Teacher.objects.get(id=response.data["id"]).user)
+
+    def test_a_teacher_with_no_phone_has_no_password_to_be_given(self):
+        response = self.client.post(self.list_url, self.payload(phone=""), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Teacher.objects.get(id=response.data["id"]).user)
+        self.assertFalse(User.objects.filter(email="asif@holychildschool.edu.bd").exists())
+
+    def test_an_account_that_already_exists_is_linked_rather_than_duplicated(self):
+        existing = User.objects.create_user(
+            email="asif@holychildschool.edu.bd", full_name="Asif Ahmed", password="StrongPass!2026"
+        )
+
+        response = self.client.post(self.list_url, self.payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Teacher.objects.get(id=response.data["id"]).user_id, existing.id)
+        self.assertEqual(User.objects.filter(email="asif@holychildschool.edu.bd").count(), 1)
+        existing.refresh_from_db()
+        self.assertTrue(existing.check_password("StrongPass!2026"))
+
+    def test_an_email_that_already_signs_in_as_another_teacher_is_rejected(self):
+        first = self.client.post(self.list_url, self.payload(), format="json")
+
+        second = self.client.post(
+            self.list_url, self.payload(full_name="Someone Else", phone="+8801700000001"), format="json"
+        )
+
+        self.assertEqual(second.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("email", second.data["errors"])
+        self.assertIn(first.data["employee_id"], str(second.data["errors"]["email"]))
+
+    def test_a_phone_number_already_on_another_account_is_rejected(self):
+        User.objects.create_user(
+            email="someone@example.com",
+            full_name="Someone",
+            password="StrongPass!2026",
+            phone="01700000000",
+        )
+
+        response = self.client.post(self.list_url, self.payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("phone", response.data["errors"])
+
+    def test_a_rejected_account_leaves_no_half_registered_teacher(self):
+        User.objects.create_user(
+            email="someone@example.com",
+            full_name="Someone",
+            password="StrongPass!2026",
+            phone="01700000000",
+        )
+
+        self.client.post(self.list_url, self.payload(), format="json")
+
+        self.assertFalse(Teacher.objects.exists())
+
+    def test_a_teacher_linked_to_a_named_account_keeps_that_one(self):
+        chosen = User.objects.create_user(
+            email="chosen@example.com", full_name="Chosen", password="StrongPass!2026"
+        )
+
+        response = self.client.post(self.list_url, self.payload(user=chosen.id), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Teacher.objects.get(id=response.data["id"]).user_id, chosen.id)
+        self.assertFalse(User.objects.filter(email="asif@holychildschool.edu.bd").exists())
+
+    def test_editing_a_teacher_does_not_issue_a_second_account(self):
+        created = self.client.post(self.list_url, self.payload(), format="json")
+
+        self.client.patch(
+            reverse("v1:teacher-detail", args=[created.data["id"]]),
+            {"email": "moved@holychildschool.edu.bd"},
+            format="json",
+        )
+
+        self.assertEqual(User.objects.filter(email="moved@holychildschool.edu.bd").count(), 0)

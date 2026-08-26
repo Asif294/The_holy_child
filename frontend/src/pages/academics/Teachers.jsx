@@ -82,8 +82,20 @@ export function Teachers() {
     () => [
       { name: 'full_name', label: 'Full name', required: true },
       { name: 'employee_id', label: 'Employee ID', required: true, unique: true },
-      { name: 'email', label: 'Email', type: 'email', placeholder: 'teacher@holychildschool.edu.bd' },
-      { name: 'phone', label: 'Phone', type: 'tel', placeholder: '+8801700000000' },
+      {
+        name: 'email',
+        label: 'Email',
+        type: 'email',
+        placeholder: 'teacher@holychildschool.edu.bd',
+        hint: 'Signs in to the staff account created with this record.',
+      },
+      {
+        name: 'phone',
+        label: 'Phone',
+        type: 'tel',
+        placeholder: '+8801700000000',
+        hint: 'Also the first password for that account — ask them to change it.',
+      },
       { name: 'designation', label: 'Designation', type: 'select', options: designationOptions },
       { name: 'department', label: 'Department', type: 'select', options: departmentOptions },
       { name: 'employment_type', label: 'Employment type', type: 'select', options: EMPLOYMENT_OPTIONS, defaultValue: 'full_time' },

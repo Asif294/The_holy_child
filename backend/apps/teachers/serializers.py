@@ -1,9 +1,10 @@
+from django.db import transaction
 from rest_framework import serializers
 
 from apps.common.identifiers import create_with_generated_codes
 from apps.common.serializers import MultipartModelSerializer
 from apps.teachers.models import Department, Designation, Teacher
-from apps.teachers.services import EMPLOYEE_ID_MESSAGE, next_employee_id
+from apps.teachers.services import EMPLOYEE_ID_MESSAGE, next_employee_id, provision_account
 
 
 class DesignationSerializer(serializers.ModelSerializer):
@@ -94,11 +95,26 @@ class TeacherSerializer(MultipartModelSerializer):
     def get_sections_led(self, obj) -> list[str]:
         return [str(section) for section in obj.class_teacher_of.filter(is_deleted=False)]
 
+    @transaction.atomic
     def create(self, validated_data):
-        """Fills in the employee ID when left blank, and survives losing a race for it."""
-        return create_with_generated_codes(
+        """
+        Fills in the employee ID when left blank, and survives losing a race for it.
+
+        A teacher added to the register is also given the login account that
+        goes with the record — see
+        :func:`~apps.teachers.services.provision_account` for what that needs
+        and when it is skipped. Both live in one transaction: a teacher is
+        never left half-registered because the account could not be issued.
+        """
+        teacher = create_with_generated_codes(
             super().create, validated_data, {"employee_id": next_employee_id}
         )
+        if teacher.user_id is None:
+            user = provision_account(teacher)
+            if user is not None:
+                teacher.user = user
+                teacher.save(update_fields=["user", "updated_at", "updated_by"])
+        return teacher
 
     def validate_employee_id(self, value: str) -> str:
         value = (value or "").strip().upper()
