@@ -67,6 +67,68 @@ DATABASE_ENGINE=django.db.backends.sqlite3 DATABASE_NAME=db.sqlite3 python manag
 
 ---
 
+## Docker
+
+Two self-contained stacks under `docker/`, one per environment. Each holds its
+own compose file, Dockerfiles, nginx config and `.env`:
+
+```
+docker/
+├── README.md    the command reference — running, resetting, tests, database, logs
+├── dev/         docker-compose.yml · Dockerfile.backend · Dockerfile.frontend · nginx.conf · .env
+└── prod/        docker-compose.yml · Dockerfile.backend · Dockerfile.frontend · nginx.conf · .env
+```
+
+```bash
+# Development — Django autoreloads, Vite hot-reloads, both behind nginx
+cd docker/dev
+cp .env.example .env          # fill in SECRET_KEY, the database and admin passwords
+docker compose up --build     # http://localhost
+
+# Production
+cd docker/prod
+cp .env.example .env          # then set DOMAIN and your real hostnames
+docker compose up -d --build
+```
+
+**Development** puts the whole site on **http://localhost** — nginx serves
+`/static/` and `/media/` from the shared volumes, forwards `/api/` and
+`/admin/` to Django, and passes everything else to the Vite dev server with the
+websocket upgrade that hot reloading needs. Both application containers run
+against a bind mount, so an edit on the host reloads in the container. Postgres
+is published on **5433**, leaving 5432 to any PostgreSQL already installed.
+
+**Production** is the same shape with the pieces swapped: gunicorn instead of
+`runserver`, and the built React app served by its own nginx instead of Vite.
+The outer nginx terminates TLS, redirects HTTP, rate-limits `/api/` and
+`/admin/`, and is the only service publishing a port. `DOMAIN` from `.env` is
+substituted into `nginx.conf` when the container starts.
+
+> First deploy: the HTTPS block needs certificates that do not exist yet.
+> Comment out the `443` server, bring the stack up on HTTP, issue the
+> certificates through the `/.well-known/acme-challenge/` location into
+> `docker/prod/certbot/`, then uncomment it and restart nginx.
+
+Both stacks migrate, collect static files and seed permissions, roles and the
+admin account on every start — all three are idempotent, so a restart is never
+a special case. The database, uploads and static files live in named volumes
+and survive `docker compose down`; `down -v` destroys them.
+
+```bash
+docker compose logs -f backend                     # follow one service
+docker compose exec backend python manage.py test  # run the suite in the container
+docker compose exec db psql -U holy_user the_holy  # a psql prompt
+```
+
+> Running Django on the host against the containerised database instead? Point
+> `backend/.env` at it — `DATABASE_HOST=localhost` and `DATABASE_PORT=5433`,
+> with the engine, name, user and password from `docker/dev/.env`.
+
+Everything else — resetting a stack, running the tests, dumping the database,
+issuing certificates — is in **[`docker/README.md`](docker/README.md)**.
+
+---
+
 ## Configuration
 
 Both `.env.example` files document every variable; these are the ones that
