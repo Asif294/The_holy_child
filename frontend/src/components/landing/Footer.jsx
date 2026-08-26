@@ -113,24 +113,19 @@ export function Footer() {
             © {new Date().getFullYear()} {school.name_en}. All rights reserved.
           </p>
 
-          <div className="flex flex-col items-center gap-x-4 gap-y-2 sm:flex-row">
-            <p className="text-center">
-              Developed by <span className="font-semibold text-white">{DEVELOPER.name}</span>
-              <a
-                href={DEVELOPER.whatsapp}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-2 inline-flex items-center gap-1.5 align-middle transition-colors hover:text-white"
-              >
-                <MessageCircle className="h-3.5 w-3.5 shrink-0 text-gold-400" aria-hidden="true" />
-                <span className="sr-only">WhatsApp </span>
-                {DEVELOPER.phone}
-              </a>
-            </p>
-            <p>
-              Powered by <span className="font-semibold text-white">{school.brand_name}</span>
-            </p>
-          </div>
+          <p className="text-center">
+            Developed by <span className="font-semibold text-white">{DEVELOPER.name}</span>
+            <a
+              href={DEVELOPER.whatsapp}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-2 inline-flex items-center gap-1.5 align-middle transition-colors hover:text-white"
+            >
+              <MessageCircle className="h-3.5 w-3.5 shrink-0 text-gold-400" aria-hidden="true" />
+              <span className="sr-only">WhatsApp </span>
+              {DEVELOPER.phone}
+            </a>
+          </p>
         </div>
       </div>
     </footer>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import AboutSchool from '@/components/landing/AboutSchool'
 import Administration from '@/components/landing/Administration'
+import BackToTop from '@/components/landing/BackToTop'
 import Footer from '@/components/landing/Footer'
 import HeroSlider from '@/components/landing/HeroSlider'
 import Navbar from '@/components/landing/Navbar'
@@ -68,6 +69,7 @@ export function Landing() {
         <SuccessfulStudents years={data.years} initialStudents={data.students} />
       </main>
       <Footer />
+      <BackToTop />
     </div>
   )
 }
