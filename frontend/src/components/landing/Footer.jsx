@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Mail, MapPin, Phone } from 'lucide-react'
+import { Mail, MapPin, MessageCircle, Phone } from 'lucide-react'
 
 import { LogoMark } from '@/components/common/Logo'
 import useSchool from '@/hooks/useSchool'
@@ -29,6 +29,14 @@ const COLUMNS = [
     links: [{ label: 'Admin sign-in', to: '/login' }],
   },
 ]
+
+// Who to reach about the site itself, as opposed to the school. The number is
+// written the way it is dialled locally and linked the way WhatsApp needs it.
+const DEVELOPER = {
+  name: 'Asifur Rahman',
+  phone: '01885430525',
+  whatsapp: 'https://wa.me/8801885430525',
+}
 
 export function Footer() {
   const { school } = useSchool()
@@ -100,13 +108,29 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row">
-          <p className="text-xs text-brand-300">
+        <div className="mt-12 flex flex-col items-center gap-3 border-t border-white/10 pt-6 text-xs text-brand-300 sm:flex-row sm:justify-between">
+          <p>
             © {new Date().getFullYear()} {school.name_en}. All rights reserved.
           </p>
-          <p className="text-xs text-brand-300">
-            Powered by <span className="font-semibold text-white">{school.brand_name}</span>
-          </p>
+
+          <div className="flex flex-col items-center gap-x-4 gap-y-2 sm:flex-row">
+            <p className="text-center">
+              Developed by <span className="font-semibold text-white">{DEVELOPER.name}</span>
+              <a
+                href={DEVELOPER.whatsapp}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-2 inline-flex items-center gap-1.5 align-middle transition-colors hover:text-white"
+              >
+                <MessageCircle className="h-3.5 w-3.5 shrink-0 text-gold-400" aria-hidden="true" />
+                <span className="sr-only">WhatsApp </span>
+                {DEVELOPER.phone}
+              </a>
+            </p>
+            <p>
+              Powered by <span className="font-semibold text-white">{school.brand_name}</span>
+            </p>
+          </div>
         </div>
       </div>
     </footer>
